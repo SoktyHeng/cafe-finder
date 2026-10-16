@@ -12,13 +12,13 @@ All routes return JSON. Errors always use the shape below and never include vend
 | `AUTH_REQUIRED` | 401 |
 | `FORBIDDEN` | 403 |
 | `NOT_FOUND` | 404 |
-| `RATE_LIMITED` | 429 |
+| `RATE_LIMITED` | 429 (with `Retry-After`) |
 | `INTERNAL_ERROR` | 500 |
 | `UPSTREAM_UNAVAILABLE` | 503 |
 
-Source: [src/lib/security/api-error.ts](../src/lib/security/api-error.ts).
+Source: [src/lib/security/api-error.ts](../src/lib/security/api-error.ts). Every response sets `Cache-Control: no-store`, because Google content must not be cached.
 
-## `POST /api/places/nearby` (M1)
+## `POST /api/places/nearby` (M1, live provider M2)
 
 Implementation: [src/app/api/places/nearby/handler.ts](../src/app/api/places/nearby/handler.ts).
 
@@ -60,15 +60,18 @@ Implementation: [src/app/api/places/nearby/handler.ts](../src/app/api/places/nea
   "searchedAt": "2026-10-16T00:00:00.000Z",
   "source": "fixture",
   "coverageNote": "Results are a subset of nearby cafes, not an exhaustive list.",
-  "excluded": { "belowMinRating": 0, "closedNow": 0, "permanentlyClosed": 1 }
+  "excluded": { "belowMinRating": 0, "closedNow": 0, "permanentlyClosed": 1 },
+  "attributions": []
 }
 ```
 
-`searchedAt` above is illustrative. Each result conforms to `cafePlaceSchema` in [src/lib/places/schemas.ts](../src/lib/places/schemas.ts). Every Google-derived field is optional, and a missing field means "unknown".
+- `source` is `google` or `fixture`. `searchedAt` above is illustrative.
+- `attributions` lists third-party data providers that must be credited next to "Google Maps" (see [google-maps-compliance.md](google-maps-compliance.md)).
+- Each result conforms to `cafePlaceSchema` in [src/lib/places/schemas.ts](../src/lib/places/schemas.ts). Every Google-derived field is optional, and a missing field means "unknown". Results may include `googleMapsUri`, an official link whose host is allowlisted.
 
 ### Hard filters and unknown data (M1)
 
-Implementation: [src/lib/recommendation/filters.ts](../src/lib/recommendation/filters.ts).
+Implementation: [src/lib/recommendation/filters.ts](../src/lib/recommendation/filters.ts). Places are de-duplicated by place ID first.
 
 | Rule | Removed | Kept and labelled |
 |---|---|---|
@@ -82,7 +85,28 @@ Results are currently ordered by straight-line distance, with unknown distances 
 ### Errors
 
 - `400 VALIDATION_ERROR`: wrong content type, a body over 2 KB, malformed JSON, schema violations (the message lists field names only), or a radius above the configured maximum.
-- `503 UPSTREAM_UNAVAILABLE`: the configured provider cannot serve requests. `PLACES_PROVIDER=google` returns this until M2.
-- `500 INTERNAL_ERROR`: an unexpected failure. It is logged as `{"event":"nearby_search_failed","errorName":…}` with no coordinates.
+- `429 RATE_LIMITED`: the per-client or global limit was reached. Only valid requests count toward the limit.
+- `503 UPSTREAM_UNAVAILABLE`: Google is down, timed out, over quota, rejected the key, or returned an unexpected body. The public message is generic, and the reason is only logged.
+- `500 INTERNAL_ERROR`: an unexpected failure, logged as `{"event":"nearby_search_failed","errorName":…}` with no coordinates.
 
-Rate limiting (`429`) is added with the live provider in M2.
+## `GET /api/places/[placeId]` (M2)
+
+Implementation: [src/app/api/places/[placeId]/handler.ts](../src/app/api/places/%5BplaceId%5D/handler.ts). Details are fetched on demand with the narrow details field mask. No UI calls this endpoint until M4.
+
+- `placeId` must contain only letters, digits, `_` and `-`, up to 512 characters. Otherwise the response is `400`.
+- `200` returns `{ place, fetchedAt, source, attributions }`. `place` is a `CafePlace` plus:
+  - optional `weekdayDescriptions`, the source's text in the place's local time;
+  - optional `utcOffsetMinutes`;
+  - optional `websiteUri`, http or https only;
+  - optional `phoneNumber`;
+  - required `photos`, up to 5, each `{ name, widthPx?, heightPx?, authorAttributions: [{ displayName, uri? }] }`.
+- `404 NOT_FOUND` for unknown IDs, `429` when rate-limited, `503` for an upstream failure.
+- Photo `name` values are short-lived and must not be stored. Author attributions must be displayed with each photo.
+
+## `GET /api/places/photo?name=…&maxWidthPx=…` (M2)
+
+Implementation: [src/app/api/places/photo/handler.ts](../src/app/api/places/photo/handler.ts).
+
+- `name` must match `places/{id}/photos/{ref}`. `maxWidthPx` is 200, 400 (the default) or 800.
+- `302` redirects to a `*.googleusercontent.com` image URL, with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. The key stays on the server, and any other redirect host is refused.
+- `400` for an invalid name or width, `404` for an expired or unknown photo (refetch the details), `429` when rate-limited, `503` for an upstream failure.

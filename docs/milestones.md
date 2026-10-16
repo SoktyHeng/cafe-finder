@@ -4,13 +4,81 @@
 |---|---|
 | M0 — Repository foundation | ✅ Complete (2026-10-16) |
 | M1 — Discovery UI and location | ✅ Complete (2026-10-16) |
-| M2 — Google Places live provider | Not started |
+| M2 — Google Places live provider | ✅ Implemented and verified offline (2026-10-16). Live verification with a real key pending |
 | M3 — Ranking and filters | Not started |
 | M4 — Maps and cafe details | Not started |
 | M5 — Auth and favorites | Not started |
 | M6 — Original community amenities | Not started |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M2 — Google Places live provider
+
+### Delivered
+
+- **`lib/google/`** (server only)
+  - A Places API (New) client for Nearby Search, Place Details and photo media.
+  - The key goes only in the `X-Goog-Api-Key` header. Field masks are explicit and pinned.
+  - Each attempt times out after 5 s. There is one retry, for 5xx and network errors only.
+  - Errors are classified as auth, quota, not found, bad request, unavailable, timeout or invalid response. Key problems that Google reports as `400 API_KEY_INVALID` count as auth.
+  - Each call logs its endpoint, SKU, outcome and latency, with no key and no coordinates.
+- **`GooglePlacesProvider`**
+  - Requests `includedTypes: ["cafe", "coffee_shop"]`, 20 results at most, with a bounded radius.
+  - Maps Google responses to the DTO explicitly: missing fields stay unknown, and `openNow` is never coerced.
+  - Validates each place on its own, de-duplicates by ID, and allowlists URLs.
+  - Collects third-party attributions.
+  - Raises vendor errors as a provider-neutral unavailable error.
+- **Provider switching:** `PLACES_PROVIDER=fixture|google`. Fixture mode is still the default and needs no keys.
+- **New endpoints**
+  - `GET /api/places/[placeId]`: rating, hours (`weekdayDescriptions`), website, phone, and up to 5 photos with author credits.
+  - `GET /api/places/photo`: a validated proxy that redirects to the image, so the key stays on the server and only Google image hosts are allowed. Nothing is cached.
+- **Abuse and cost protection**
+  - Per-client limits: 10 searches, 30 details and 60 photos per minute.
+  - A per-instance global cap of 120 per minute.
+  - `429` responses with `Retry-After`.
+  - Client keys are hashed IPs, used only when `TRUST_PROXY=true`.
+- **UI**
+  - "Google Maps" attribution in Roboto 400 with `translate="no"`, plus any third-party providers.
+  - "Open in Google Maps" links on cards.
+  - "Hours can change" caveat. The existing loading, error and empty states cover the live provider.
+- **Tooling**
+  - `pnpm check:secrets` builds with canary secrets and scans the output for leaks.
+  - `pnpm smoke:live` is a manual check of a live server.
+- **Docs:** [google-maps-compliance.md](google-maps-compliance.md) (SKUs, masks, caching and attribution decisions), [deployment.md](deployment.md) (keys, quotas, budgets, kill switch, monitoring), and updated API contracts.
+
+### Acceptance verification (2026-10-16)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| With configured keys, live search returns genuine cafe info | ⏳ **Pending a real key** | Not run: no key is available in this environment. A production server in Google mode with a deliberately invalid key reached `places.googleapis.com` for all three endpoints. Google answered `400 INVALID_ARGUMENT / API_KEY_INVALID`, the app returned a generic 503, and the logs recorded `outcome: auth` without the key. To finish: set a key in `.env.local`, then run `pnpm build && pnpm start` and `pnpm smoke:live` |
+| Fixture mode still works without keys | ✅ | All E2E tests run in fixture mode: 49 passed, 1 mobile-only skip |
+| Tests verify request shapes and no leakage | ✅ | Pinned field masks. Exact URL, method, headers and body. The key never appears in URLs, errors or logs. The secret scan of 286 build files found no canaries |
+| Policy notes documented | ✅ | [google-maps-compliance.md](google-maps-compliance.md) |
+| Controlled errors | ✅ | 400, 403, 404, 429, 5xx, timeout and invalid-response paths are unit tested. Routes return safe 404, 429 and 503 bodies |
+| Quota and rate protections | ✅ | Rate-limit unit and route tests. Quotas and budgets are documented for Google Cloud |
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 26 files, 285 tests passed |
+| `pnpm build` | Pass |
+| `pnpm test:e2e` | 49 passed, 1 skipped |
+| `pnpm check:secrets` | Pass |
+
+### Decisions and deviations
+
+- **The details and photo endpoints are built, but they have no UI yet.** The details page, photo display with author credits, map and directions are M4 (CLAUDE.md §16). Building them now would front-load M4.
+- **Enterprise SKU for search.** The rating and open-now filters need Enterprise fields. A cheaper Pro-only mask is documented as an option.
+- **Text attribution "Google Maps" rather than the logo.** The policy allows text where space is limited. Switching to the official logo asset is a pre-launch follow-up.
+- **No photos in search results**, to avoid up to 20 photo charges per search.
+- **Opening hours are taken as Google's `weekdayDescriptions` text.** Full timezone-aware formatting arrives with the details page in M4.
+
+### Remaining risks and follow-ups
+
+- The live behaviour is unverified until a key is configured.
+- Rate limits are in memory, per instance. On serverless, Google Cloud quotas are the real ceiling. Consider a shared store in M8.
+- `TRUST_PROXY` must be set correctly in production, otherwise every user shares one bucket.
+- `PLACES_PROVIDER` is baked into the prerendered footer, so a rebuild is needed after switching.
 
 ## M1 — Discovery UI and location
 

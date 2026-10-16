@@ -31,6 +31,10 @@ describe("parseServerEnv", () => {
       ENABLE_COMMUNITY_REPORTS: false,
       MAX_SEARCH_RADIUS_METERS: 15_000,
       DISCOVERY_RATE_LIMIT_PER_MINUTE: 10,
+      PLACE_DETAILS_RATE_LIMIT_PER_MINUTE: 30,
+      PLACE_PHOTOS_RATE_LIMIT_PER_MINUTE: 60,
+      PLACES_GLOBAL_RATE_LIMIT_PER_MINUTE: 120,
+      TRUST_PROXY: false,
     });
   });
 
@@ -110,8 +114,8 @@ describe("parseServerEnv", () => {
   it.each([
     ["0", false],
     ["1", true],
-    ["1000", true],
-    ["1001", false],
+    ["10000", true],
+    ["10001", false],
   ])("DISCOVERY_RATE_LIMIT_PER_MINUTE=%s valid=%s", (value, valid) => {
     const parse = () =>
       parseServerEnv({ DISCOVERY_RATE_LIMIT_PER_MINUTE: value });

@@ -26,6 +26,11 @@ export default defineConfig({
     env: {
       PLACES_PROVIDER: "fixture",
       NEXT_PUBLIC_APP_URL: baseURL,
+      // All tests share one client; production defaults would throttle the suite.
+      DISCOVERY_RATE_LIMIT_PER_MINUTE: "10000",
+      PLACE_DETAILS_RATE_LIMIT_PER_MINUTE: "10000",
+      PLACE_PHOTOS_RATE_LIMIT_PER_MINUTE: "10000",
+      PLACES_GLOBAL_RATE_LIMIT_PER_MINUTE: "10000",
     },
   },
 });

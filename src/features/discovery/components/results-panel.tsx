@@ -3,6 +3,7 @@
 import { AlertCircle, SearchX } from "lucide-react";
 import { useId } from "react";
 
+import { GoogleMapsAttribution } from "@/components/google-maps-attribution";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -239,6 +240,15 @@ function Results({
           <p className="text-sm font-medium" data-testid="demo-results-notice">
             Demo mode: these cafes are fictional.
           </p>
+        )}
+        {data.source === "google" && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Ratings, opening status and details come from Google. Hours can
+              change, so confirm with the cafe.
+            </p>
+            <GoogleMapsAttribution providers={data.attributions} className="mt-1" />
+          </>
         )}
       </div>
       <ol className="flex flex-col gap-3" aria-label="Cafes">

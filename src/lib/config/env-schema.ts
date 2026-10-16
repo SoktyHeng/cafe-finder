@@ -16,8 +16,15 @@ export const SEARCH_RADIUS_LIMITS = {
 
 export const RATE_LIMIT_LIMITS = {
   minPerMinute: 1,
-  maxPerMinute: 1_000,
-  defaultPerMinute: 10,
+  maxPerMinute: 10_000,
+  /** Per client: discovery searches (each may be one billable Nearby Search). */
+  defaultDiscoveryPerMinute: 10,
+  /** Per client: place details lookups. */
+  defaultDetailsPerMinute: 30,
+  /** Per client: photo media lookups. */
+  defaultPhotosPerMinute: 60,
+  /** Whole server instance: all Places requests combined. */
+  defaultGlobalPerMinute: 120,
 } as const;
 
 export const PLACES_PROVIDERS = ["fixture", "google"] as const;
@@ -68,8 +75,29 @@ export const serverEnvSchema = z
     DISCOVERY_RATE_LIMIT_PER_MINUTE: integerInRange(
       RATE_LIMIT_LIMITS.minPerMinute,
       RATE_LIMIT_LIMITS.maxPerMinute,
-      RATE_LIMIT_LIMITS.defaultPerMinute,
+      RATE_LIMIT_LIMITS.defaultDiscoveryPerMinute,
     ),
+    PLACE_DETAILS_RATE_LIMIT_PER_MINUTE: integerInRange(
+      RATE_LIMIT_LIMITS.minPerMinute,
+      RATE_LIMIT_LIMITS.maxPerMinute,
+      RATE_LIMIT_LIMITS.defaultDetailsPerMinute,
+    ),
+    PLACE_PHOTOS_RATE_LIMIT_PER_MINUTE: integerInRange(
+      RATE_LIMIT_LIMITS.minPerMinute,
+      RATE_LIMIT_LIMITS.maxPerMinute,
+      RATE_LIMIT_LIMITS.defaultPhotosPerMinute,
+    ),
+    PLACES_GLOBAL_RATE_LIMIT_PER_MINUTE: integerInRange(
+      RATE_LIMIT_LIMITS.minPerMinute,
+      RATE_LIMIT_LIMITS.maxPerMinute,
+      RATE_LIMIT_LIMITS.defaultGlobalPerMinute,
+    ),
+    /**
+     * Use X-Forwarded-For / X-Real-IP to tell clients apart. Enable only behind
+     * a proxy that overwrites these headers (e.g. Vercel); otherwise all
+     * clients share one rate-limit bucket, which is safe but strict.
+     */
+    TRUST_PROXY: booleanFlag,
   })
   .superRefine((env, ctx) => {
     if (env.PLACES_PROVIDER === "google" && !env.GOOGLE_PLACES_SERVER_API_KEY) {

@@ -76,4 +76,22 @@ describe("CafeCard", () => {
       "Quiet",
     ]);
   });
+
+  it("links to the place on Google Maps in a new tab", () => {
+    render(
+      <CafeCard
+        cafe={{ placeId: "p5", name: "Linked", googleMapsUri: "https://maps.google.com/?cid=1", dataSource: "google" }}
+        unverifiedPreferences={[]}
+      />,
+    );
+    const link = screen.getByRole("link", { name: /open in google maps: linked/i });
+    expect(link).toHaveAttribute("href", "https://maps.google.com/?cid=1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("has no Google Maps link without a URI", () => {
+    render(<CafeCard cafe={{ placeId: "p6", dataSource: "fixture" }} unverifiedPreferences={[]} />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
 });

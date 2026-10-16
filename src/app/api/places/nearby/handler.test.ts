@@ -7,6 +7,8 @@ import {
 } from "@/lib/places/provider";
 import { nearbySearchResponseSchema } from "@/lib/places/schemas";
 import { apiErrorBodySchema } from "@/lib/security/api-error";
+import { FixedWindowRateLimiter } from "@/lib/security/rate-limit";
+import { createRequestGuard, type RequestGuard } from "@/lib/security/request-guard";
 
 import { MAX_BODY_BYTES, createNearbySearchHandler } from "./handler";
 
@@ -23,13 +25,16 @@ function makeHandler(
   overrides: {
     provider?: PlacesProvider | (() => never);
     maxRadius?: number;
+    guard?: RequestGuard;
   } = {},
 ) {
   return createNearbySearchHandler({
     getEnv: () => ({
       PLACES_PROVIDER: "fixture",
+      GOOGLE_PLACES_SERVER_API_KEY: undefined,
       MAX_SEARCH_RADIUS_METERS: overrides.maxRadius ?? 15_000,
     }),
+    guard: () => overrides.guard ?? (() => null),
     getProvider: () => {
       const provider = overrides.provider ?? new FixturePlacesProvider();
       return typeof provider === "function" ? provider() : provider;
@@ -173,6 +178,8 @@ describe("POST /api/places/nearby", () => {
       const failing: PlacesProvider = {
         source: "fixture",
         searchNearby: () => Promise.reject(new Error("upstream said: key=AIzaSECRET")),
+        getPlaceDetails: () => Promise.resolve(null),
+        getPhotoUrl: () => Promise.resolve(null),
       };
       const response = await makeHandler({ provider: failing })(post(VALID_BODY));
       const error = await errorOf(response);
@@ -185,5 +192,62 @@ describe("POST /api/places/nearby", () => {
       expect(logged).not.toContain("AIzaSECRET");
       expect(logged).not.toContain("11.553");
     });
+  });
+
+  describe("rate limiting", () => {
+    const guardWith = (perClientLimit: number, globalLimit = 100) =>
+      createRequestGuard({
+        name: "test",
+        perClientLimit,
+        globalLimiter: new FixedWindowRateLimiter({ limit: globalLimit, windowMs: 60_000 }),
+        trustProxy: false,
+      });
+
+    it("returns 429 with Retry-After once the client limit is reached", async () => {
+      const handler = makeHandler({ guard: guardWith(2) });
+      expect((await handler(post(VALID_BODY))).status).toBe(200);
+      expect((await handler(post(VALID_BODY))).status).toBe(200);
+
+      const limited = await handler(post(VALID_BODY));
+      expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect((await errorOf(limited)).code).toBe("RATE_LIMITED");
+    });
+
+    it("does not spend the limit on invalid requests", async () => {
+      const handler = makeHandler({ guard: guardWith(1) });
+      expect((await handler(post({ ...VALID_BODY, purpose: "x" }))).status).toBe(400);
+      expect((await handler(post(VALID_BODY))).status).toBe(200);
+    });
+
+    it("never calls the provider when limited", async () => {
+      const provider = new FixturePlacesProvider();
+      const spy = vi.spyOn(provider, "searchNearby");
+      const handler = makeHandler({ provider, guard: guardWith(1) });
+      await handler(post(VALID_BODY));
+      await handler(post(VALID_BODY));
+      expect(spy).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("passes provider attributions and de-duplicates places", async () => {
+    const provider: PlacesProvider = {
+      source: "google",
+      searchNearby: async () => ({
+        places: [
+          { placeId: "ChIJa", latitude: 11.553, longitude: 104.925, dataSource: "google" },
+          { placeId: "ChIJa", latitude: 11.553, longitude: 104.925, dataSource: "google" },
+        ],
+        attributions: [{ provider: "Example Data Co" }],
+      }),
+      getPlaceDetails: async () => null,
+      getPhotoUrl: async () => null,
+    };
+    const body = nearbySearchResponseSchema.parse(
+      await (await makeHandler({ provider })(post(VALID_BODY))).json(),
+    );
+    expect(body.source).toBe("google");
+    expect(body.results.map((cafe) => cafe.placeId)).toEqual(["ChIJa"]);
+    expect(body.attributions).toEqual([{ provider: "Example Data Co" }]);
   });
 });

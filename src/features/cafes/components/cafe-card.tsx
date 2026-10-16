@@ -1,4 +1,4 @@
-import { CircleHelp, Clock, Navigation, Star, Tag } from "lucide-react";
+import { CircleHelp, Clock, ExternalLink, Navigation, Star, Tag } from "lucide-react";
 import { useId } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +71,19 @@ export function CafeCard({ cafe, unverifiedPreferences }: CafeCardProps) {
           </li>
         )}
       </ul>
+
+      {cafe.googleMapsUri && (
+        <a
+          href={cafe.googleMapsUri}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          <ExternalLink aria-hidden="true" className="size-4" />
+          Open in Google Maps
+          <span className="sr-only">: {cafe.name ?? "this cafe"} (opens in a new tab)</span>
+        </a>
+      )}
 
       {unverifiedPreferences.length > 0 && (
         <div className="flex flex-col gap-1.5 border-t pt-3">

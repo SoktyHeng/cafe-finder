@@ -17,6 +17,7 @@ const OK_BODY = {
   source: "fixture",
   coverageNote: "Results are a subset of nearby cafes, not an exhaustive list.",
   excluded: { belowMinRating: 0, closedNow: 0, permanentlyClosed: 0 },
+  attributions: [],
 };
 
 const respond = (body: unknown, status = 200) =>

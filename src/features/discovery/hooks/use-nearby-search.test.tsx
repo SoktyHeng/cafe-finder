@@ -25,6 +25,7 @@ const SUCCESS: SearchOutcome = {
     source: "fixture",
     coverageNote: "",
     excluded: { belowMinRating: 0, closedNow: 0, permanentlyClosed: 0 },
+    attributions: [],
   },
 };
 

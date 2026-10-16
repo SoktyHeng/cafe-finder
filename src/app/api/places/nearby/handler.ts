@@ -1,5 +1,6 @@
 import type { ServerEnv } from "@/lib/config/env-schema";
 import { discoveryRequestSchema } from "@/lib/discovery/request-schema";
+import { logEvent } from "@/lib/observability/log";
 import {
   PlacesProviderUnavailableError,
   type PlacesProvider,
@@ -10,17 +11,26 @@ import {
 } from "@/lib/places/schemas";
 import {
   applyHardFilters,
+  dedupeByPlaceId,
   orderByDistance,
   withDistance,
 } from "@/lib/recommendation/filters";
-import { apiError } from "@/lib/security/api-error";
+import { UPSTREAM_UNAVAILABLE_MESSAGE, apiError } from "@/lib/security/api-error";
+import type { RequestGuard } from "@/lib/security/request-guard";
 
 /** A discovery request is ~300 bytes; anything far larger is not legitimate. */
 export const MAX_BODY_BYTES = 2_048;
 
+type NearbyEnv = Pick<
+  ServerEnv,
+  "PLACES_PROVIDER" | "GOOGLE_PLACES_SERVER_API_KEY" | "MAX_SEARCH_RADIUS_METERS"
+>;
+
 export type NearbyHandlerDeps = {
-  getEnv: () => Pick<ServerEnv, "PLACES_PROVIDER" | "MAX_SEARCH_RADIUS_METERS">;
-  getProvider: (env: Pick<ServerEnv, "PLACES_PROVIDER">) => PlacesProvider;
+  getEnv: () => NearbyEnv;
+  getProvider: (env: NearbyEnv) => PlacesProvider;
+  /** Rate limiting; returns a ready 429 response when the caller must wait. */
+  guard: (env: NearbyEnv) => RequestGuard;
   now?: () => Date;
 };
 
@@ -46,6 +56,7 @@ async function readJsonBody(
 export function createNearbySearchHandler({
   getEnv,
   getProvider,
+  guard,
   now = () => new Date(),
 }: NearbyHandlerDeps) {
   return async function handleNearbySearch(request: Request): Promise<Response> {
@@ -75,17 +86,22 @@ export function createNearbySearchHandler({
           `Search radius cannot exceed ${env.MAX_SEARCH_RADIUS_METERS / 1000} km.`,
         );
       }
+      // Rate limit only valid requests, right before the (billable) upstream call.
+      const limited = guard(env)(request);
+      if (limited) {
+        return limited;
+      }
 
       const provider = getProvider(env);
       const origin = {
         latitude: discovery.latitude,
         longitude: discovery.longitude,
       };
-      const candidates = await provider.searchNearby({
+      const { places, attributions } = await provider.searchNearby({
         center: origin,
         radiusMeters: discovery.radiusMeters,
       });
-      const { kept, excluded } = applyHardFilters(candidates, discovery);
+      const { kept, excluded } = applyHardFilters(dedupeByPlaceId(places), discovery);
 
       const response: NearbySearchResponse = {
         results: orderByDistance(withDistance(kept, origin)),
@@ -93,24 +109,20 @@ export function createNearbySearchHandler({
         source: provider.source,
         coverageNote: COVERAGE_NOTE,
         excluded,
+        attributions,
       };
       return Response.json(response, {
         headers: { "Cache-Control": "no-store" },
       });
     } catch (error) {
       if (error instanceof PlacesProviderUnavailableError) {
-        return apiError(
-          "UPSTREAM_UNAVAILABLE",
-          "Cafe search is temporarily unavailable. Please try again later.",
-        );
+        logEvent("warn", "nearby_search_unavailable", { reason: error.message });
+        return apiError("UPSTREAM_UNAVAILABLE", UPSTREAM_UNAVAILABLE_MESSAGE);
       }
       // Structured, coordinate-free log line.
-      console.error(
-        JSON.stringify({
-          event: "nearby_search_failed",
-          errorName: error instanceof Error ? error.name : "unknown",
-        }),
-      );
+      logEvent("error", "nearby_search_failed", {
+        errorName: error instanceof Error ? error.name : "unknown",
+      });
       return apiError("INTERNAL_ERROR", "Something went wrong. Please try again.");
     }
   };

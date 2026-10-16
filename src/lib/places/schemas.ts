@@ -37,6 +37,8 @@ export const cafePlaceSchema = z.strictObject({
   /** `undefined` = unknown. Never coerce unknown to `false`. */
   openNow: z.boolean().optional(),
   businessStatus: z.enum(BUSINESS_STATUSES).optional(),
+  /** Official Google Maps link for the place (allowlisted hosts only). */
+  googleMapsUri: z.url({ protocol: /^https$/ }).optional(),
   /** Straight-line distance from the search origin, derived by Cafe Finder. */
   distanceMeters: z.number().min(0).optional(),
   dataSource: z.enum(DATA_SOURCES),
@@ -55,6 +57,14 @@ export type ExcludedCounts = z.infer<typeof excludedCountsSchema>;
 export const COVERAGE_NOTE =
   "Results are a subset of nearby cafes, not an exhaustive list.";
 
+/** Third-party data providers Google requires us to credit next to its data. */
+export const dataProviderAttributionSchema = z.strictObject({
+  provider: z.string().min(1),
+  providerUri: z.url({ protocol: /^https?$/ }).optional(),
+});
+
+export type DataProviderAttribution = z.infer<typeof dataProviderAttributionSchema>;
+
 export const nearbySearchResponseSchema = z.strictObject({
   results: z.array(cafePlaceSchema),
   searchedAt: z.iso.datetime(),
@@ -62,6 +72,55 @@ export const nearbySearchResponseSchema = z.strictObject({
   coverageNote: z.string(),
   /** How many candidates the hard filters removed, so empty states can explain why. */
   excluded: excludedCountsSchema,
+  attributions: z.array(dataProviderAttributionSchema),
 });
 
 export type NearbySearchResponse = z.infer<typeof nearbySearchResponseSchema>;
+
+/** Matches Google place IDs and fixture IDs without excluding legitimate characters. */
+export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,512}$/;
+
+/**
+ * Photo resource name, e.g. `places/{placeId}/photos/{photoRef}`. Opaque,
+ * short-lived and never persisted (Google: photo names can't be cached).
+ */
+export const PHOTO_NAME_PATTERN =
+  /^places\/[A-Za-z0-9_-]{1,512}\/photos\/[A-Za-z0-9_-]{1,2048}$/;
+
+export const photoAuthorAttributionSchema = z.strictObject({
+  displayName: z.string().min(1),
+  uri: z.url({ protocol: /^https$/ }).optional(),
+});
+
+export const placePhotoSchema = z.strictObject({
+  name: z.string().regex(PHOTO_NAME_PATTERN),
+  widthPx: z.number().int().positive().optional(),
+  heightPx: z.number().int().positive().optional(),
+  /** Must be displayed wherever the photo is shown (may be empty). */
+  authorAttributions: z.array(photoAuthorAttributionSchema),
+});
+
+export type PlacePhoto = z.infer<typeof placePhotoSchema>;
+
+/** Max photos returned per place; each one shown costs a Place Photo request. */
+export const MAX_DETAIL_PHOTOS = 5;
+
+export const cafeDetailsSchema = cafePlaceSchema.extend({
+  /** Human-readable weekly hours as provided by the source, in the place's local time. */
+  weekdayDescriptions: z.array(z.string()).max(7).optional(),
+  utcOffsetMinutes: z.number().int().optional(),
+  websiteUri: z.url({ protocol: /^https?$/ }).optional(),
+  phoneNumber: z.string().max(64).optional(),
+  photos: z.array(placePhotoSchema).max(MAX_DETAIL_PHOTOS),
+});
+
+export type CafeDetails = z.infer<typeof cafeDetailsSchema>;
+
+export const placeDetailsResponseSchema = z.strictObject({
+  place: cafeDetailsSchema,
+  fetchedAt: z.iso.datetime(),
+  source: z.enum(DATA_SOURCES),
+  attributions: z.array(dataProviderAttributionSchema),
+});
+
+export type PlaceDetailsResponse = z.infer<typeof placeDetailsResponseSchema>;

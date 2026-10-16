@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Roboto } from "next/font/google";
 
 import { AppFooter } from "@/components/app-footer";
 import { AppHeader } from "@/components/app-header";
@@ -9,6 +9,13 @@ import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-sans",
+  subsets: ["latin"],
+});
+
+/** Google Maps attribution text must be set in Roboto 400. */
+const roboto = Roboto({
+  variable: "--font-roboto",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -31,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   const { PLACES_PROVIDER } = getServerEnv();
 
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${roboto.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <a
           href="#main-content"

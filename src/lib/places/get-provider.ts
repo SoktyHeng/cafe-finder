@@ -1,20 +1,33 @@
 import "server-only";
 
 import type { ServerEnv } from "@/lib/config/env-schema";
+import { GooglePlacesClient } from "@/lib/google/places-client";
 
 import { FixturePlacesProvider } from "./fixture-provider";
+import { GooglePlacesProvider } from "./google-provider";
 import { PlacesProviderUnavailableError, type PlacesProvider } from "./provider";
 
-export function getPlacesProvider(
-  env: Pick<ServerEnv, "PLACES_PROVIDER">,
-): PlacesProvider {
+export type ProviderEnv = Pick<ServerEnv, "PLACES_PROVIDER" | "GOOGLE_PLACES_SERVER_API_KEY">;
+
+let cachedGoogleProvider: { apiKey: string; provider: GooglePlacesProvider } | undefined;
+
+export function getPlacesProvider(env: ProviderEnv): PlacesProvider {
   switch (env.PLACES_PROVIDER) {
     case "fixture":
       return new FixturePlacesProvider();
-    case "google":
-      // The live Google Places adapter is built in M2.
-      throw new PlacesProviderUnavailableError(
-        "The Google Places provider is not implemented yet.",
-      );
+    case "google": {
+      const apiKey = env.GOOGLE_PLACES_SERVER_API_KEY;
+      if (!apiKey) {
+        // Env validation normally prevents this; fail closed if it doesn't.
+        throw new PlacesProviderUnavailableError("google:missing_key");
+      }
+      if (cachedGoogleProvider?.apiKey !== apiKey) {
+        cachedGoogleProvider = {
+          apiKey,
+          provider: new GooglePlacesProvider(new GooglePlacesClient({ apiKey })),
+        };
+      }
+      return cachedGoogleProvider.provider;
+    }
   }
 }

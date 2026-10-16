@@ -50,6 +50,16 @@ export function applyHardFilters(
   return { kept, excluded };
 }
 
+/** Keeps the first occurrence of each place ID. */
+export function dedupeByPlaceId(cafes: readonly CafePlace[]): CafePlace[] {
+  const seen = new Set<string>();
+  return cafes.filter((cafe) => {
+    if (seen.has(cafe.placeId)) return false;
+    seen.add(cafe.placeId);
+    return true;
+  });
+}
+
 /** Adds straight-line distance where the cafe's coordinates are known. */
 export function withDistance(
   cafes: readonly CafePlace[],

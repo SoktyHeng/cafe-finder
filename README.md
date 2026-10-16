@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M1 (discovery UI and location) complete.** Search works end to end with **fictional fixture cafes**. Google Places is not connected yet (M2). See [docs/milestones.md](docs/milestones.md).
+> **Status: M2 (Google Places live provider) complete.** Live search uses Places API (New) when `PLACES_PROVIDER=google` and a server key are set. Without keys the app runs on clearly labelled **fictional fixture cafes**. See [docs/milestones.md](docs/milestones.md).
 
 ## Stack
 
@@ -22,6 +22,16 @@ The app starts in **fixture mode** (`PLACES_PROVIDER=fixture`) with no Google or
 
 Try it: open `/`, pick an area (for example "BKK1") or use your location, then press **Find My Cafe**.
 
+### Live Google data
+
+```bash
+# .env.local
+PLACES_PROVIDER=google
+GOOGLE_PLACES_SERVER_API_KEY=<server key restricted to "Places API (New)">
+```
+
+Rebuild or restart after changing the provider. Before going live, read [docs/deployment.md](docs/deployment.md) (key restrictions, quotas, budget alerts, `TRUST_PROXY`) and [docs/google-maps-compliance.md](docs/google-maps-compliance.md) (field masks and SKUs, no caching, attribution). `pnpm smoke:live` verifies a running live server and makes about 3 billable calls.
+
 ## Commands
 
 | Command | Purpose |
@@ -33,6 +43,8 @@ Try it: open `/`, pick an area (for example "BKK1") or use your location, then p
 | `pnpm test` / `pnpm test:watch` | Vitest unit and component tests |
 | `pnpm test:e2e` | Playwright smoke tests (builds and starts the app on port 3100 in fixture mode) |
 | `pnpm check` | lint + typecheck + unit tests |
+| `pnpm check:secrets` | Production build with canary secrets, then a scan of the output for leaks |
+| `pnpm smoke:live` | Manual check of a running live-mode server (billable) |
 
 Before running E2E tests for the first time, run `pnpm exec playwright install chromium`.
 
@@ -65,18 +77,22 @@ src/
   features/cafes/      cafe card and formatting
   lib/config/          validated environment
   lib/discovery/       discovery request schema (shared client/server)
-  lib/places/          CafePlace DTO, PlacesProvider, fixture provider + fictional data
+  lib/google/          server-only Places API (New) client, field masks, error mapping
+  lib/places/          DTOs, PlacesProvider, Google + fixture providers, normalization
   lib/recommendation/  hard filters and interim ordering
-  lib/geo/ lib/locations/ lib/security/
+  lib/security/        error contract, rate limits, URL allowlists
+  lib/geo/ lib/locations/ lib/observability/
 tests/e2e/             Playwright specs (smoke, discovery, accessibility)
 docs/                  architecture, API contracts, testing, milestones
 ```
 
-Folders for later milestones (`lib/google/`, `lib/supabase/`, `supabase/` and others) are created in the milestone that needs them. See CLAUDE.md §5. API details are in [docs/api-contracts.md](docs/api-contracts.md).
+Folders for later milestones (`lib/supabase/`, `supabase/` and others) are created in the milestone that needs them. See CLAUDE.md §5. API details are in [docs/api-contracts.md](docs/api-contracts.md).
 
 ## Known limitations
 
-- Only fictional fixture data so far. The live Google Places provider, rate limiting and quotas arrive in M2.
+- Live mode needs your own Google key. CI and E2E use fixtures and mocked responses only.
+- Rate limits are in memory, per server instance. Google Cloud quotas are the hard ceiling.
+- Place details and photos are available through the API, but the details page and photo display arrive in M4.
 - Results are ordered by straight-line distance. Explainable ranking arrives in M3.
 - Budget, Wi-Fi, quietness and purpose fit can't be verified yet. They are shown as "not verified" and never filter results.
 - Manual location means choosing one of the approximate Phnom Penh areas. There is no address search or map yet (M4).

@@ -26,6 +26,7 @@ const response = (overrides: Partial<NearbySearchResponse> = {}): NearbySearchRe
   source: "fixture",
   coverageNote: "Results are a subset of nearby cafes, not an exhaustive list.",
   excluded: { belowMinRating: 0, closedNow: 0, permanentlyClosed: 0 },
+  attributions: [],
   ...overrides,
 });
 
@@ -71,6 +72,28 @@ describe("ResultsPanel", () => {
       .map((id) => document.getElementById(id ?? "")?.textContent);
     expect(names).toEqual(["First", "Second"]);
     expect(within(list).getAllByText("Wi-Fi")).toHaveLength(2);
+  });
+
+  it("shows Google Maps attribution and an hours caveat for Google results", () => {
+    renderPanel({
+      status: "done",
+      outcome: {
+        ok: true,
+        data: response({
+          source: "google",
+          results: [{ placeId: "ChIJa", name: "Real", dataSource: "google" }],
+          attributions: [{ provider: "Data Co" }],
+        }),
+      },
+    });
+    expect(screen.getByTestId("google-maps-attribution")).toHaveTextContent("Google Maps · Data: Data Co");
+    expect(screen.getByText(/hours can change/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("demo-results-notice")).not.toBeInTheDocument();
+  });
+
+  it("does not show Google attribution for demo data", () => {
+    renderPanel({ status: "done", outcome: { ok: true, data: response() } });
+    expect(screen.queryByTestId("google-maps-attribution")).not.toBeInTheDocument();
   });
 
   it("explains an empty result and offers to edit the search", async () => {

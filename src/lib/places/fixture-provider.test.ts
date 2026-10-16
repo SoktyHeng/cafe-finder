@@ -29,7 +29,10 @@ describe("fixture data", () => {
 describe("FixturePlacesProvider", () => {
   it("returns only cafes inside the search circle", async () => {
     const provider = new FixturePlacesProvider();
-    const results = await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 1000 });
+    const { places: results } = await provider.searchNearby({
+      center: CITY_CENTRE,
+      radiusMeters: 1000,
+    });
 
     expect(results.length).toBeGreaterThan(0);
     for (const cafe of results) {
@@ -48,7 +51,7 @@ describe("FixturePlacesProvider", () => {
       center: { latitude: 51.5, longitude: -0.12 },
       radiusMeters: 15_000,
     });
-    expect(results).toEqual([]);
+    expect(results).toEqual({ places: [], attributions: [] });
   });
 
   it("caps results at the Nearby Search maximum", async () => {
@@ -59,8 +62,8 @@ describe("FixturePlacesProvider", () => {
       dataSource: "fixture",
     }));
     const provider = new FixturePlacesProvider(many);
-    const results = await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 1000 });
-    expect(results).toHaveLength(MAX_NEARBY_RESULTS);
+    const { places } = await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 1000 });
+    expect(places).toHaveLength(MAX_NEARBY_RESULTS);
   });
 
   it("skips cafes without coordinates", async () => {
@@ -68,14 +71,34 @@ describe("FixturePlacesProvider", () => {
       { placeId: "fixture-900", dataSource: "fixture" },
     ]);
     expect(
-      await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 15_000 }),
+      (await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 15_000 })).places,
     ).toEqual([]);
   });
 
   it("returns copies, not the shared fixture objects", async () => {
     const provider = new FixturePlacesProvider();
-    const [first] = await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 15_000 });
+    const {
+      places: [first],
+    } = await provider.searchNearby({ center: CITY_CENTRE, radiusMeters: 15_000 });
     expect(first).toBeDefined();
     expect(FIXTURE_CAFES).not.toContain(first);
+  });
+});
+
+describe("FixturePlacesProvider details and photos", () => {
+  it("returns fixture details without invented hours, photos or contact data", async () => {
+    const provider = new FixturePlacesProvider();
+    const result = await provider.getPlaceDetails("fixture-001");
+
+    expect(result?.place).toMatchObject({ placeId: "fixture-001", dataSource: "fixture", photos: [] });
+    expect(result?.place.weekdayDescriptions).toBeUndefined();
+    expect(result?.place.websiteUri).toBeUndefined();
+    expect(result?.place.phoneNumber).toBeUndefined();
+  });
+
+  it("returns null for unknown places and photos", async () => {
+    const provider = new FixturePlacesProvider();
+    expect(await provider.getPlaceDetails("ChIJunknown")).toBeNull();
+    expect(await provider.getPhotoUrl("places/x/photos/y", 400)).toBeNull();
   });
 });

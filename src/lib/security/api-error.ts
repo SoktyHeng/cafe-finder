@@ -32,10 +32,18 @@ export type ApiErrorBody = z.infer<typeof apiErrorBodySchema>;
  * Builds an error response. `message` must be safe for end users. Never pass
  * vendor payloads, keys or stack traces.
  */
-export function apiError(code: ApiErrorCode, message: string): Response {
+export function apiError(
+  code: ApiErrorCode,
+  message: string,
+  headers: Record<string, string> = {},
+): Response {
   const body: ApiErrorBody = { error: { code, message } };
   return Response.json(body, {
     status: API_ERROR_STATUS[code],
-    headers: { "Cache-Control": "no-store" },
+    headers: { "Cache-Control": "no-store", ...headers },
   });
 }
+
+/** Safe public message for any upstream/provider outage. */
+export const UPSTREAM_UNAVAILABLE_MESSAGE =
+  "Cafe search is temporarily unavailable. Please try again later.";
