@@ -1,20 +1,19 @@
 import type { ServerEnv } from "@/lib/config/env-schema";
 import { discoveryRequestSchema } from "@/lib/discovery/request-schema";
+import type { NearbySearchResponse } from "@/lib/discovery/response-schema";
 import { logEvent } from "@/lib/observability/log";
 import {
   PlacesProviderUnavailableError,
   type PlacesProvider,
 } from "@/lib/places/provider";
-import {
-  COVERAGE_NOTE,
-  type NearbySearchResponse,
-} from "@/lib/places/schemas";
+import { COVERAGE_NOTE } from "@/lib/places/schemas";
+import { DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/recommendation/config";
 import {
   applyHardFilters,
   dedupeByPlaceId,
-  orderByDistance,
   withDistance,
 } from "@/lib/recommendation/filters";
+import { rankCafes } from "@/lib/recommendation/score";
 import { UPSTREAM_UNAVAILABLE_MESSAGE, apiError } from "@/lib/security/api-error";
 import type { RequestGuard } from "@/lib/security/request-guard";
 
@@ -31,6 +30,8 @@ export type NearbyHandlerDeps = {
   getProvider: (env: NearbyEnv) => PlacesProvider;
   /** Rate limiting; returns a ready 429 response when the caller must wait. */
   guard: (env: NearbyEnv) => RequestGuard;
+  /** Ranking weights and thresholds (defaults in lib/recommendation/config.ts). */
+  scoringConfig?: ScoringConfig;
   now?: () => Date;
 };
 
@@ -57,6 +58,7 @@ export function createNearbySearchHandler({
   getEnv,
   getProvider,
   guard,
+  scoringConfig = DEFAULT_SCORING_CONFIG,
   now = () => new Date(),
 }: NearbyHandlerDeps) {
   return async function handleNearbySearch(request: Request): Promise<Response> {
@@ -104,7 +106,7 @@ export function createNearbySearchHandler({
       const { kept, excluded } = applyHardFilters(dedupeByPlaceId(places), discovery);
 
       const response: NearbySearchResponse = {
-        results: orderByDistance(withDistance(kept, origin)),
+        results: rankCafes(withDistance(kept, origin), discovery, { config: scoringConfig }),
         searchedAt: now().toISOString(),
         source: provider.source,
         coverageNote: COVERAGE_NOTE,

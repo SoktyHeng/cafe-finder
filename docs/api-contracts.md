@@ -18,7 +18,7 @@ All routes return JSON. Errors always use the shape below and never include vend
 
 Source: [src/lib/security/api-error.ts](../src/lib/security/api-error.ts). Every response sets `Cache-Control: no-store`, because Google content must not be cached.
 
-## `POST /api/places/nearby` (M1, live provider M2)
+## `POST /api/places/nearby` (M1, live provider M2, ranking M3)
 
 Implementation: [src/app/api/places/nearby/handler.ts](../src/app/api/places/nearby/handler.ts).
 
@@ -46,15 +46,28 @@ Implementation: [src/app/api/places/nearby/handler.ts](../src/app/api/places/nea
 {
   "results": [
     {
-      "placeId": "fixture-001",
-      "name": "Lantern Bean Demo Cafe",
-      "latitude": 11.5551,
-      "longitude": 104.9262,
-      "rating": 4.6,
-      "ratingCount": 412,
-      "openNow": true,
-      "distanceMeters": 268,
-      "dataSource": "fixture"
+      "cafe": {
+        "placeId": "fixture-001",
+        "name": "Lantern Bean Demo Cafe",
+        "rating": 4.6,
+        "ratingCount": 412,
+        "openNow": true,
+        "distanceMeters": 268,
+        "dataSource": "fixture"
+      },
+      "score": 0.7432,
+      "matchPercent": 74,
+      "confidence": "high",
+      "coverage": 0.8,
+      "factors": [
+        { "factor": "rating", "weight": 25, "score": 0.6124 },
+        { "factor": "distance", "weight": 25, "score": 0.9107 },
+        { "factor": "openNow", "weight": 10, "score": 1 },
+        { "factor": "atmosphere", "weight": 15, "score": null }
+      ],
+      "knownMatchReasons": ["Well rated in demo data", "Very close to you", "Open now (according to demo data)"],
+      "cautions": [],
+      "unverifiedPreferences": ["Good for work or study"]
     }
   ],
   "searchedAt": "2026-10-16T00:00:00.000Z",
@@ -67,7 +80,8 @@ Implementation: [src/app/api/places/nearby/handler.ts](../src/app/api/places/nea
 
 - `source` is `google` or `fixture`. `searchedAt` above is illustrative.
 - `attributions` lists third-party data providers that must be credited next to "Google Maps" (see [google-maps-compliance.md](google-maps-compliance.md)).
-- Each result conforms to `cafePlaceSchema` in [src/lib/places/schemas.ts](../src/lib/places/schemas.ts). Every Google-derived field is optional, and a missing field means "unknown". Results may include `googleMapsUri`, an official link whose host is allowlisted.
+- `results` are ranked `Recommendation`s, best first ([src/lib/recommendation/schemas.ts](../src/lib/recommendation/schemas.ts)). The scoring is described in [recommendation-scoring.md](recommendation-scoring.md). `matchPercent` is `null` when confidence is low. A factor `score` of `null` means unknown, which counts as neutral. The values in the example above are illustrative.
+- `cafe` conforms to `cafePlaceSchema` in [src/lib/places/schemas.ts](../src/lib/places/schemas.ts). Every Google-derived field is optional, and a missing field means "unknown". `googleMapsUri` is an official link whose host is allowlisted.
 
 ### Hard filters and unknown data (M1)
 
@@ -80,7 +94,7 @@ Implementation: [src/lib/recommendation/filters.ts](../src/lib/recommendation/fi
 | `openNowOnly` | `openNow === false` | Unknown hours ("Opening hours unknown") |
 | Budget, Wi-Fi, quiet, purpose | Never | Shown on every card as "Not verified" |
 
-Results are currently ordered by straight-line distance, with unknown distances last and ties broken by place ID. Explainable scoring replaces this order in M3.
+After filtering, results are ranked by score, then distance, then place ID (M3).
 
 ### Errors
 

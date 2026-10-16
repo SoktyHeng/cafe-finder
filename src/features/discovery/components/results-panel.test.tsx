@@ -3,47 +3,38 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DiscoveryRequest } from "@/lib/discovery/request-schema";
-import type { NearbySearchResponse } from "@/lib/places/schemas";
+import { TEST_REQUEST, nearbyResponse, testCafe } from "@/test/recommendations";
 
 import type { NearbySearchState } from "../hooks/use-nearby-search";
 import { ResultsPanel, describeExclusions } from "./results-panel";
 
-const REQUEST: DiscoveryRequest = {
-  latitude: 11.553,
-  longitude: 104.925,
-  radiusMeters: 3000,
-  purpose: "work",
-  minRating: 4.5,
-  preferWifi: true,
-};
+const REQUEST: DiscoveryRequest = { ...TEST_REQUEST, minRating: 4.5, preferWifi: true };
 
-const response = (overrides: Partial<NearbySearchResponse> = {}): NearbySearchResponse => ({
-  results: [
-    { placeId: "fixture-001", name: "First", distanceMeters: 200, dataSource: "fixture" },
-    { placeId: "fixture-002", name: "Second", distanceMeters: 900, dataSource: "fixture" },
-  ],
-  searchedAt: "2026-10-16T00:00:00.000Z",
-  source: "fixture",
-  coverageNote: "Results are a subset of nearby cafes, not an exhaustive list.",
-  excluded: { belowMinRating: 0, closedNow: 0, permanentlyClosed: 0 },
-  attributions: [],
-  ...overrides,
-});
+const NEAR = testCafe({ placeId: "fixture-001", name: "Near", distanceMeters: 200, rating: 4.6, ratingCount: 300, openNow: true });
+const FAR = testCafe({ placeId: "fixture-002", name: "Far", distanceMeters: 2900, rating: 4.6, ratingCount: 300, openNow: true });
 
-function renderPanel(state: NearbySearchState) {
+function renderPanel(state: NearbySearchState, request: DiscoveryRequest = REQUEST) {
   const onRetry = vi.fn();
   const onEditSearch = vi.fn();
+  const onRelax = vi.fn();
   render(
     <ResultsPanel
       state={state}
-      request={REQUEST}
+      request={request}
       locationLabel="BKK1"
+      maxRadiusMeters={15_000}
       onRetry={onRetry}
       onEditSearch={onEditSearch}
+      onRelax={onRelax}
     />,
   );
-  return { onRetry, onEditSearch, user: userEvent.setup() };
+  return { onRetry, onEditSearch, onRelax, user: userEvent.setup() };
 }
+
+const cardNames = () =>
+  within(screen.getByRole("list", { name: "Cafes, best match first" }))
+    .getAllByRole("article")
+    .map((article) => document.getElementById(article.getAttribute("aria-labelledby") ?? "")?.textContent);
 
 describe("ResultsPanel", () => {
   it("prompts for a search when idle", () => {
@@ -57,21 +48,24 @@ describe("ResultsPanel", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Searching for cafes");
   });
 
-  it("lists results in order with context and announces the count", () => {
-    renderPanel({ status: "done", outcome: { ok: true, data: response() } });
+  it("lists ranked results in server order and explains the ranking", () => {
+    renderPanel({ status: "done", outcome: { ok: true, data: nearbyResponse([FAR, NEAR], {}, REQUEST) } });
 
     expect(screen.getByRole("heading", { name: "2 cafes within 3 km of BKK1" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("2 cafes found.");
-    expect(screen.getByText(/not an exhaustive list/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 cafes found, best match first.");
+    expect(screen.getByText(/Best match first, ranked by rating, distance, opening status/)).toBeInTheDocument();
+    expect(screen.getByText(/can.t verify count as neutral/)).toBeInTheDocument();
     expect(screen.getByTestId("demo-results-notice")).toBeInTheDocument();
+    expect(cardNames()).toEqual(["Near", "Far"]);
+    expect(screen.getAllByText("Wi-Fi")).toHaveLength(2);
+  });
 
-    const list = screen.getByRole("list", { name: "Cafes" });
-    const names = within(list)
-      .getAllByRole("article")
-      .map((article) => article.getAttribute("aria-labelledby"))
-      .map((id) => document.getElementById(id ?? "")?.textContent);
-    expect(names).toEqual(["First", "Second"]);
-    expect(within(list).getAllByText("Wi-Fi")).toHaveLength(2);
+  it("mentions price level in the ranking note only when a budget is set", () => {
+    renderPanel(
+      { status: "done", outcome: { ok: true, data: nearbyResponse([NEAR], {}, { budget: "under_5" }) } },
+      { ...TEST_REQUEST, budget: "under_5" },
+    );
+    expect(screen.getByText(/opening status and price level/)).toBeInTheDocument();
   });
 
   it("shows Google Maps attribution and an hours caveat for Google results", () => {
@@ -79,9 +73,8 @@ describe("ResultsPanel", () => {
       status: "done",
       outcome: {
         ok: true,
-        data: response({
+        data: nearbyResponse([{ ...NEAR, dataSource: "google" }], {
           source: "google",
-          results: [{ placeId: "ChIJa", name: "Real", dataSource: "google" }],
           attributions: [{ provider: "Data Co" }],
         }),
       },
@@ -92,28 +85,35 @@ describe("ResultsPanel", () => {
   });
 
   it("does not show Google attribution for demo data", () => {
-    renderPanel({ status: "done", outcome: { ok: true, data: response() } });
+    renderPanel({ status: "done", outcome: { ok: true, data: nearbyResponse([NEAR]) } });
     expect(screen.queryByTestId("google-maps-attribution")).not.toBeInTheDocument();
   });
 
-  it("explains an empty result and offers to edit the search", async () => {
-    const { onEditSearch, user } = renderPanel({
-      status: "done",
-      outcome: {
-        ok: true,
-        data: response({
-          results: [],
-          excluded: { belowMinRating: 2, closedNow: 1, permanentlyClosed: 0 },
-        }),
+  it("explains an empty result and offers one-click relaxations", async () => {
+    const { onRelax, onEditSearch, user } = renderPanel(
+      {
+        status: "done",
+        outcome: {
+          ok: true,
+          data: nearbyResponse([], { excluded: { belowMinRating: 2, closedNow: 1, permanentlyClosed: 0 } }),
+        },
       },
-    });
+      { ...REQUEST, openNowOnly: true },
+    );
 
-    expect(
-      screen.getByRole("heading", { name: "No cafes found within 3 km of BKK1" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No cafes found within 3 km of BKK1" })).toBeInTheDocument();
     expect(
       screen.getByText("Hidden by your filters: 2 cafes rated below 4.5, 1 cafe closed now."),
     ).toBeInTheDocument();
+
+    const options = within(screen.getByRole("list", { name: "Ways to widen your search" }));
+    await user.click(options.getByRole("button", { name: "Include 2 cafes rated below 4.5" }));
+    expect(onRelax).toHaveBeenLastCalledWith({ kind: "removeMinRating" });
+    await user.click(options.getByRole("button", { name: "Include 1 cafe closed right now" }));
+    expect(onRelax).toHaveBeenLastCalledWith({ kind: "includeClosed" });
+    await user.click(options.getByRole("button", { name: "Search within 5 km" }));
+    expect(onRelax).toHaveBeenLastCalledWith({ kind: "widenRadius", radiusMeters: 5000 });
+
     await user.click(screen.getByRole("button", { name: "Edit search" }));
     expect(onEditSearch).toHaveBeenCalledOnce();
   });

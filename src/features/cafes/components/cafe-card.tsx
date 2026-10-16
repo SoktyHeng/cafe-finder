@@ -1,16 +1,17 @@
-import { CircleHelp, Clock, ExternalLink, Navigation, Star, Tag } from "lucide-react";
+import { Clock, ExternalLink, Navigation, Star, Tag } from "lucide-react";
 import { useId } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import type { CafePlace } from "@/lib/places/schemas";
+import type { Recommendation } from "@/lib/recommendation/schemas";
 import { cn } from "@/lib/utils";
 
 import { formatDistance, openStatus, priceLevelText, ratingText } from "../format";
+import { MatchBadge, MatchExplanation } from "./match-explanation";
 
 type CafeCardProps = {
-  cafe: CafePlace;
-  /** The user's preferences that cannot be checked for this cafe. */
-  unverifiedPreferences: readonly string[];
+  recommendation: Recommendation;
+  /** 1-based position in the ranked list. */
+  rank: number;
 };
 
 const OPEN_TONE_CLASS = {
@@ -19,30 +20,41 @@ const OPEN_TONE_CLASS = {
   unknown: "text-muted-foreground",
 } as const;
 
-export function CafeCard({ cafe, unverifiedPreferences }: CafeCardProps) {
+export function CafeCard({ recommendation, rank }: CafeCardProps) {
   const headingId = useId();
+  const { cafe } = recommendation;
   const open = openStatus(cafe);
+  const isBestMatch = rank === 1 && recommendation.matchPercent !== null;
 
   return (
     <article
       aria-labelledby={headingId}
       className="flex flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground"
     >
-      <header className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 id={headingId} className="text-base font-semibold leading-snug">
-            {cafe.name ?? "Unnamed cafe"}
-          </h3>
-          {cafe.dataSource === "fixture" && (
-            <Badge variant="outline" title="Fictional cafe for demonstration">
-              Demo data
-            </Badge>
-          )}
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground tabular-nums">
+              {rank}.
+            </span>
+            <h3 id={headingId} className="text-base leading-snug font-semibold">
+              {cafe.name ?? "Unnamed cafe"}
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {isBestMatch && <Badge>Best match</Badge>}
+            {cafe.dataSource === "fixture" && (
+              <Badge variant="outline" title="Fictional cafe for demonstration">
+                Demo data
+              </Badge>
+            )}
+            {cafe.businessStatus === "closed_temporarily" && (
+              <Badge variant="destructive">Temporarily closed</Badge>
+            )}
+          </div>
+          {cafe.address && <p className="text-sm text-muted-foreground">{cafe.address}</p>}
         </div>
-        {cafe.address && <p className="text-sm text-muted-foreground">{cafe.address}</p>}
-        {cafe.businessStatus === "closed_temporarily" && (
-          <Badge variant="destructive">Temporarily closed</Badge>
-        )}
+        <MatchBadge recommendation={recommendation} />
       </header>
 
       <ul className="flex flex-col gap-1.5 text-sm">
@@ -85,23 +97,7 @@ export function CafeCard({ cafe, unverifiedPreferences }: CafeCardProps) {
         </a>
       )}
 
-      {unverifiedPreferences.length > 0 && (
-        <div className="flex flex-col gap-1.5 border-t pt-3">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <CircleHelp aria-hidden="true" className="size-3.5" />
-            Not verified for this cafe:
-          </p>
-          <ul className="flex flex-wrap gap-1.5" aria-label="Preferences not verified">
-            {unverifiedPreferences.map((preference) => (
-              <li key={preference}>
-                <Badge variant="secondary" className="font-normal">
-                  {preference}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <MatchExplanation recommendation={recommendation} />
     </article>
   );
 }

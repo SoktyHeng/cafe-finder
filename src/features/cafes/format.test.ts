@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { unverifiedPreferences } from "@/features/discovery/unverified-preferences";
-
 import { formatDistance, openStatus, priceLevelText, ratingText } from "./format";
 
 describe("formatDistance", () => {
@@ -55,30 +53,5 @@ describe("openStatus", () => {
 describe("priceLevelText", () => {
   it("describes a qualitative level", () => {
     expect(priceLevelText("very_expensive")).toBe("Price level: Very expensive");
-  });
-});
-
-describe("unverifiedPreferences", () => {
-  const base = { latitude: 0, longitude: 0, radiusMeters: 3000 } as const;
-
-  it("always includes the purpose's atmosphere", () => {
-    expect(unverifiedPreferences({ ...base, purpose: "work" })).toEqual([
-      "Good for work or study",
-    ]);
-  });
-
-  it("lists budget, Wi-Fi and quiet only when requested", () => {
-    expect(
-      unverifiedPreferences({
-        ...base,
-        purpose: "date",
-        budget: "under_5",
-        preferWifi: true,
-        preferQuiet: true,
-      }),
-    ).toEqual(["Good for a date", "Budget Under $5", "Wi-Fi", "Quiet"]);
-    expect(unverifiedPreferences({ ...base, purpose: "relax", budget: "any" })).toEqual([
-      "Relaxed atmosphere",
-    ]);
   });
 });

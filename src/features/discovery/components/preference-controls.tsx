@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 
 import type { Budget } from "@/lib/discovery/request-schema";
 
-import { BUDGET_OPTIONS } from "../options";
+import { BUDGET_OPTIONS } from "@/lib/discovery/options";
 
 type PreferenceControlsProps = {
   budget: Budget;

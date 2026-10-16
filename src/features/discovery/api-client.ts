@@ -2,7 +2,7 @@ import type { DiscoveryRequest } from "@/lib/discovery/request-schema";
 import {
   nearbySearchResponseSchema,
   type NearbySearchResponse,
-} from "@/lib/places/schemas";
+} from "@/lib/discovery/response-schema";
 import { apiErrorBodySchema, type ApiErrorCode } from "@/lib/security/api-error";
 
 export const NEARBY_SEARCH_PATH = "/api/places/nearby";

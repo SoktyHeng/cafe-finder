@@ -5,7 +5,7 @@ import { useId } from "react";
 import { formatRadius } from "@/features/cafes/format";
 import { RADIUS_METERS } from "@/lib/discovery/request-schema";
 
-import { MIN_RATING_OPTIONS } from "../options";
+import { MIN_RATING_OPTIONS } from "@/lib/discovery/options";
 
 type FilterControlsProps = {
   radiusMeters: number;

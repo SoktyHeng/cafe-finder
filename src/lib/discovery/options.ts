@@ -1,4 +1,4 @@
-import type { Budget, Purpose } from "@/lib/discovery/request-schema";
+import type { Budget, Purpose } from "./request-schema";
 
 export const PURPOSE_OPTIONS: readonly {
   value: Purpose;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CafePlace } from "@/lib/places/schemas";
 
-import { applyHardFilters, orderByDistance, withDistance } from "./filters";
+import { applyHardFilters, dedupeByPlaceId, withDistance } from "./filters";
 
 const cafe = (overrides: Partial<CafePlace> & { placeId: string }): CafePlace => ({
   dataSource: "fixture",
@@ -83,22 +83,16 @@ describe("withDistance", () => {
   });
 });
 
-describe("orderByDistance", () => {
-  it("sorts nearest first, unknown last, ties by place ID, without mutating input", () => {
-    const input = [
-      cafe({ placeId: "unknown" }),
-      cafe({ placeId: "far", distanceMeters: 900 }),
-      cafe({ placeId: "tie-b", distanceMeters: 100 }),
-      cafe({ placeId: "tie-a", distanceMeters: 100 }),
-    ];
-    const snapshot = [...input];
-
-    expect(orderByDistance(input).map((item) => item.placeId)).toEqual([
-      "tie-a",
-      "tie-b",
-      "far",
-      "unknown",
+describe("dedupeByPlaceId", () => {
+  it("keeps the first occurrence of each place", () => {
+    const result = dedupeByPlaceId([
+      cafe({ placeId: "a", name: "first" }),
+      cafe({ placeId: "b" }),
+      cafe({ placeId: "a", name: "second" }),
     ]);
-    expect(input).toEqual(snapshot);
+    expect(result.map((item) => [item.placeId, item.name])).toEqual([
+      ["a", "first"],
+      ["b", undefined],
+    ]);
   });
 });

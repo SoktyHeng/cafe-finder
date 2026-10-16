@@ -6,9 +6,10 @@ import { useId, useMemo, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { RelaxationChange } from "@/lib/recommendation/relaxation";
 import { cn } from "@/lib/utils";
 
-import { toDiscoveryRequest, type ReadyFormValues } from "../form-state";
+import { applyRelaxation, toDiscoveryRequest, type ReadyFormValues } from "../form-state";
 import { useNearbySearch } from "../hooks/use-nearby-search";
 import { formValuesToSearchParams, searchParamsToFormValues } from "../url-state";
 import { DiscoveryForm } from "./discovery-form";
@@ -61,6 +62,12 @@ export function DiscoveryView({ maxRadiusMeters }: DiscoveryViewProps) {
     router.push(`${pathname}?${next}`, { scroll: false });
   };
 
+  const handleRelax = (change: RelaxationChange) => {
+    if (parsed.status === "ready") {
+      handleSubmit(applyRelaxation(parsed.values, change));
+    }
+  };
+
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-10 lg:py-10">
       <div className="flex flex-col gap-4 lg:col-span-2">
@@ -103,6 +110,8 @@ export function DiscoveryView({ maxRadiusMeters }: DiscoveryViewProps) {
         state={state}
         request={request}
         locationLabel={parsed.status === "ready" ? parsed.values.location.label : null}
+        maxRadiusMeters={maxRadiusMeters}
+        onRelax={handleRelax}
         onRetry={retry}
         onEditSearch={openSettings}
       />

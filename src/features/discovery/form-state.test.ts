@@ -5,6 +5,7 @@ import { findAreaById } from "@/lib/locations/cities";
 
 import {
   DEFAULT_FORM_VALUES,
+  applyRelaxation,
   areaLocation,
   deviceLocation,
   isReady,
@@ -65,5 +66,23 @@ describe("form state", () => {
       preferWifi: true,
     });
     expect(discoveryRequestSchema.safeParse(request).success).toBe(true);
+  });
+});
+
+describe("applyRelaxation", () => {
+  const values = {
+    ...DEFAULT_FORM_VALUES,
+    location: areaLocation(riverside),
+    minRating: 4.5,
+    openNowOnly: true,
+  };
+
+  it("applies each relaxation without touching other settings", () => {
+    expect(applyRelaxation(values, { kind: "removeMinRating" })).toEqual({ ...values, minRating: undefined });
+    expect(applyRelaxation(values, { kind: "includeClosed" })).toEqual({ ...values, openNowOnly: false });
+    expect(applyRelaxation(values, { kind: "widenRadius", radiusMeters: 10_000 })).toEqual({
+      ...values,
+      radiusMeters: 10_000,
+    });
   });
 });

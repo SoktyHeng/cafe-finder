@@ -1,6 +1,6 @@
 # Architecture
 
-The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M2).
+The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M3).
 
 ```text
 Browser
@@ -18,7 +18,7 @@ Server
        │     ├─ FixturePlacesProvider (fictional demo cafes)
        │     └─ GooglePlacesProvider → normalize ← GooglePlacesClient (lib/google/, server only)
        │                                              └─ places.googleapis.com (key in header)
-       ├─ applyHardFilters / withDistance / orderByDistance   lib/recommendation/
+       ├─ applyHardFilters → withDistance → rankCafes (weighted, explainable)   lib/recommendation/
        └─ apiError (safe error contract)            lib/security/
 ```
 
@@ -38,12 +38,15 @@ Server
 | `lib/observability/log.ts` | Structured JSON logs with no sensitive fields |
 | `app/api/places/[placeId]`, `app/api/places/photo` | Details and photo-proxy endpoints (M2, used by the M4 UI) |
 | `lib/discovery/request-schema.ts` | Discovery request schema and enums, shared by client and server |
-| `lib/recommendation/filters.ts` | Pure hard filters, distance enrichment and interim ordering |
+| `lib/recommendation/filters.ts` | Pure hard filters, de-duplication and distance enrichment |
+| `lib/recommendation/config.ts`, `factors.ts`, `score.ts`, `schemas.ts` | Configurable weighted scoring, evidence-backed explanations, confidence and match percentages (see [recommendation-scoring.md](recommendation-scoring.md)) |
+| `lib/recommendation/relaxation.ts` | Empty-state "widen your search" suggestions |
+| `lib/discovery/options.ts`, `response-schema.ts` | Purpose and budget labels shared by the UI and the scorer. The nearby response contract |
 | `lib/geo/distance.ts` | Haversine distance and coordinate rounding |
 | `lib/locations/cities.ts` | Manually selectable areas per city (approximate centres). Add cities here |
 | `lib/security/api-error.ts` | Error contract |
 | `features/discovery/` | Form state, URL state, API client, hooks (`useGeolocation`, `useNearbySearch`) and components |
-| `features/cafes/` | Cafe card and display formatting |
+| `features/cafes/` | Cafe card, match badge and explanation, display formatting |
 
 ## Key decisions
 

@@ -4,13 +4,69 @@
 |---|---|
 | M0 — Repository foundation | ✅ Complete (2026-10-16) |
 | M1 — Discovery UI and location | ✅ Complete (2026-10-16) |
-| M2 — Google Places live provider | ✅ Implemented and verified offline (2026-10-16). Live verification with a real key pending |
-| M3 — Ranking and filters | Not started |
+| M2 — Google Places live provider | ✅ Complete, including live verification (2026-10-16) |
+| M3 — Ranking and filters | ✅ Complete (2026-10-16) |
 | M4 — Maps and cafe details | Not started |
 | M5 — Auth and favorites | Not started |
 | M6 — Original community amenities | Not started |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M3 — Ranking and filters
+
+### Delivered
+
+- **Recommendation engine** in `lib/recommendation/`, pure and deterministic. See [recommendation-scoring.md](recommendation-scoring.md).
+  - `config.ts`: configurable, Zod-validated weights and thresholds. Defaults: rating 25, distance 25, open now 10, atmosphere 15, budget 10, Wi-Fi/quiet 15.
+  - `factors.ts`: one assessment per factor.
+    - Rating uses Bayesian shrinkage (prior 4.3, 30 virtual reviews).
+    - Distance is linear within the radius.
+    - Open now treats temporary closure as overriding `openNow`.
+    - Budget uses Google price level as a hedged soft signal.
+    - Atmosphere, Wi-Fi and quiet use explicit evidence only.
+  - `score.ts`: `scoreCafe`, `rankCafes`, `buildMatchReasons`.
+    - Unknown factors count as neutral (0.5).
+    - Coverage leads to confidence. The percentage is hidden when confidence is low.
+    - Order: score, then distance, then place ID.
+  - `relaxation.ts`: one-click empty-state suggestions, offered only where they can help.
+- **API**: `results` are now ranked `Recommendation`s carrying score, `matchPercent`, confidence, coverage, factor breakdown, reasons, cautions and unverified preferences. The scoring config is injectable in the handler.
+- **UI**:
+  - A match badge ("74% match · High confidence", or "Limited data") and a "Best match" label.
+  - "Why it matches" (✓), "Things to know" (⚠) and "Not verified for this cafe".
+  - A "How this match is calculated" table.
+  - A ranking note in the results header.
+  - Relaxation buttons in the empty state.
+- Purpose and budget labels moved to `lib/discovery/options.ts`, and the nearby response schema to `lib/discovery/response-schema.ts` (this avoids a circular import). The superseded `orderByDistance` and the client-side `unverifiedPreferences` were removed.
+
+### Acceptance verification (2026-10-16)
+
+| Criterion | Evidence |
+|---|---|
+| Pure scoring tests cover missing and contradictory fields and ties | `score.test.ts` (44 tests). Covers missing rating, distance, hours and price; zero-review ratings; temporarily closed but `openNow: true`; exact ties broken by distance and then place ID, independent of input order; no NaN with no data; custom weights; config validation |
+| All match explanations are backed by evidence | Each reason is produced only by the factor that read its field. The invariant test over 2,000 seeded random cafes and 3 requests found no reason citing a missing field. The E2E test checks that Wi-Fi is never in "Why it matches" |
+| No fake Wi-Fi, quiet or price claims | Wi-Fi, quiet and atmosphere score only with explicit evidence (none exists yet) and are otherwise listed as "not verified". Budget text always says "price level suggests…" and "not exact menu prices", and never quotes a dollar amount (tested) |
+| Live data sanity check | One live search (3 km, work, under $5, Wi-Fi): highly rated and close cafes ranked first, percentages ranged 44–71%, confidence was medium (Wi-Fi unverified), and the reasons cited only rating, distance and opening status |
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 28 files, 339 tests passed |
+| `pnpm build` | Pass |
+| `pnpm test:e2e` | 57 passed, 1 skipped (mobile-only test on the desktop project), including axe scans of the new card UI |
+| `pnpm check:secrets` | Pass |
+
+### Decisions and deviations
+
+- **Match percentages.** The request asked for them. CLAUDE.md warns against overprecise matches. The resolution: show whole numbers only, always with a confidence label; show "Limited data" when evidence is thin; and count unverifiable preferences as neutral, so the score can't reach 100% while they're unknown.
+- **Added an open-now factor (10)** to the CLAUDE.md §7.2 weights and reduced purpose (20 → 15) and budget (15 → 10) to keep the total at 100.
+- **Price level is used as soft budget evidence**, carefully worded, and never as a filter.
+- The weights are configured in code (`DEFAULT_SCORING_CONFIG`) and injectable per handler, not through environment variables. Tuning needs a review and tests, not a runtime switch.
+
+### Remaining risks and follow-ups
+
+- The weights and rating prior are uncalibrated hypotheses. Calibrate them with explicit user feedback (later milestone).
+- Atmosphere and amenities stay unknown until M6 community evidence arrives. Until then confidence tops out at "medium" whenever Wi-Fi or quiet is requested.
+- The rating prior (4.3) is tuned to Phnom Penh. Revisit it per city.
 
 ## M2 — Google Places live provider
 
@@ -50,7 +106,7 @@
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| With configured keys, live search returns genuine cafe info | ⏳ **Pending a real key** | Not run: no key is available in this environment. A production server in Google mode with a deliberately invalid key reached `places.googleapis.com` for all three endpoints. Google answered `400 INVALID_ARGUMENT / API_KEY_INVALID`, the app returned a generic 503, and the logs recorded `outcome: auth` without the key. To finish: set a key in `.env.local`, then run `pnpm build && pnpm start` and `pnpm smoke:live` |
+| With configured keys, live search returns genuine cafe info | ✅ | `pnpm smoke:live` against a production build with a real key returned 20 real cafes near Independence Monument, each with a rating, review count, open status and Maps link. Details returned hours, website and 5 photos with author credits. The photo endpoint redirected to `lh3.googleusercontent.com`. There was one `places_api_call` log line per call. Field coverage in that sample: rating, open status, business status and Maps link 20/20, price level 17/20. An earlier run with a deliberately invalid key confirmed that key errors become a safe 503 with an `auth` log entry |
 | Fixture mode still works without keys | ✅ | All E2E tests run in fixture mode: 49 passed, 1 mobile-only skip |
 | Tests verify request shapes and no leakage | ✅ | Pinned field masks. Exact URL, method, headers and body. The key never appears in URLs, errors or logs. The secret scan of 286 build files found no canaries |
 | Policy notes documented | ✅ | [google-maps-compliance.md](google-maps-compliance.md) |

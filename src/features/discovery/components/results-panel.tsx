@@ -10,18 +10,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CafeCard } from "@/features/cafes/components/cafe-card";
 import { formatRadius } from "@/features/cafes/format";
 import type { DiscoveryRequest } from "@/lib/discovery/request-schema";
-import type { ExcludedCounts, NearbySearchResponse } from "@/lib/places/schemas";
+import type { NearbySearchResponse } from "@/lib/discovery/response-schema";
+import type { ExcludedCounts } from "@/lib/places/schemas";
+import { suggestRelaxations, type RelaxationChange } from "@/lib/recommendation/relaxation";
 
 import type { SearchErrorCode } from "../api-client";
 import type { NearbySearchState } from "../hooks/use-nearby-search";
-import { unverifiedPreferences } from "../unverified-preferences";
 
 type ResultsPanelProps = {
   state: NearbySearchState;
   request: DiscoveryRequest | null;
   locationLabel: string | null;
+  maxRadiusMeters: number;
   onRetry: () => void;
   onEditSearch: () => void;
+  /** Runs a new, explicitly chosen search with one constraint loosened. */
+  onRelax: (change: RelaxationChange) => void;
 };
 
 const ERROR_COPY: Record<SearchErrorCode, { title: string; body: string; retry: boolean }> = {
@@ -81,7 +85,9 @@ function statusMessage(state: NearbySearchState): string {
   if (state.status === "loading") return "Searching for cafes…";
   if (state.status === "done" && state.outcome.ok) {
     const count = state.outcome.data.results.length;
-    return count === 0 ? "No cafes found." : `${pluralize(count, "cafe", "cafes")} found.`;
+    return count === 0
+      ? "No cafes found."
+      : `${pluralize(count, "cafe", "cafes")} found, best match first.`;
   }
   return "";
 }
@@ -90,8 +96,10 @@ export function ResultsPanel({
   state,
   request,
   locationLabel,
+  maxRadiusMeters,
   onRetry,
   onEditSearch,
+  onRelax,
 }: ResultsPanelProps) {
   const headingId = useId();
 
@@ -138,7 +146,9 @@ export function ResultsPanel({
           data={state.outcome.data}
           request={request}
           locationLabel={locationLabel ?? "the selected location"}
+          maxRadiusMeters={maxRadiusMeters}
           onEditSearch={onEditSearch}
+          onRelax={onRelax}
         />
       )}
     </section>
@@ -190,21 +200,58 @@ function ErrorState({
   );
 }
 
+function RelaxationOptions({
+  request,
+  data,
+  maxRadiusMeters,
+  onRelax,
+}: {
+  request: DiscoveryRequest;
+  data: NearbySearchResponse;
+  maxRadiusMeters: number;
+  onRelax: (change: RelaxationChange) => void;
+}) {
+  const suggestions = suggestRelaxations(request, data.excluded, maxRadiusMeters);
+  if (suggestions.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">Try a wider search:</p>
+      <ul className="flex flex-wrap gap-2" aria-label="Ways to widen your search">
+        {suggestions.map((suggestion) => (
+          <li key={suggestion.change.kind}>
+            <Button
+              size="lg"
+              variant="outline"
+              className="min-h-11 px-4"
+              onClick={() => onRelax(suggestion.change)}
+            >
+              {suggestion.label}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Results({
   headingId,
   data,
   request,
   locationLabel,
+  maxRadiusMeters,
   onEditSearch,
+  onRelax,
 }: {
   headingId: string;
   data: NearbySearchResponse;
   request: DiscoveryRequest;
   locationLabel: string;
+  maxRadiusMeters: number;
   onEditSearch: () => void;
+  onRelax: (change: RelaxationChange) => void;
 }) {
   const exclusions = describeExclusions(data.excluded, request);
-  const preferences = unverifiedPreferences(request);
   const radius = formatRadius(request.radiusMeters);
 
   if (data.results.length === 0) {
@@ -215,11 +262,13 @@ function Results({
           No cafes found within {radius} of {locationLabel}
         </h2>
         {exclusions && <p className="text-sm">{exclusions}</p>}
-        <p className="text-sm text-muted-foreground">
-          Try a larger distance, a lower minimum rating, or turning off &ldquo;Open
-          now only&rdquo;.
-        </p>
-        <Button size="lg" variant="outline" className="min-h-11 px-4" onClick={onEditSearch}>
+        <RelaxationOptions
+          request={request}
+          data={data}
+          maxRadiusMeters={maxRadiusMeters}
+          onRelax={onRelax}
+        />
+        <Button size="lg" variant="ghost" className="min-h-11 px-4" onClick={onEditSearch}>
           Edit search
         </Button>
       </div>
@@ -233,7 +282,9 @@ function Results({
           {pluralize(data.results.length, "cafe", "cafes")} within {radius} of {locationLabel}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Nearest first. {data.coverageNote}
+          Best match first, ranked by rating, distance, opening status
+          {request.budget && request.budget !== "any" ? " and price level" : ""}.
+          Things we can&apos;t verify count as neutral. {data.coverageNote}
         </p>
         {exclusions && <p className="text-sm text-muted-foreground">{exclusions}</p>}
         {data.source === "fixture" && (
@@ -251,10 +302,10 @@ function Results({
           </>
         )}
       </div>
-      <ol className="flex flex-col gap-3" aria-label="Cafes">
-        {data.results.map((cafe) => (
-          <li key={cafe.placeId}>
-            <CafeCard cafe={cafe} unverifiedPreferences={preferences} />
+      <ol className="flex flex-col gap-3" aria-label="Cafes, best match first">
+        {data.results.map((recommendation, index) => (
+          <li key={recommendation.cafe.placeId}>
+            <CafeCard recommendation={recommendation} rank={index + 1} />
           </li>
         ))}
       </ol>

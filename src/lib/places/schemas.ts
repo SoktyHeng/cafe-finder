@@ -65,17 +65,6 @@ export const dataProviderAttributionSchema = z.strictObject({
 
 export type DataProviderAttribution = z.infer<typeof dataProviderAttributionSchema>;
 
-export const nearbySearchResponseSchema = z.strictObject({
-  results: z.array(cafePlaceSchema),
-  searchedAt: z.iso.datetime(),
-  source: z.enum(DATA_SOURCES),
-  coverageNote: z.string(),
-  /** How many candidates the hard filters removed, so empty states can explain why. */
-  excluded: excludedCountsSchema,
-  attributions: z.array(dataProviderAttributionSchema),
-});
-
-export type NearbySearchResponse = z.infer<typeof nearbySearchResponseSchema>;
 
 /** Matches Google place IDs and fixture IDs without excluding legitimate characters. */
 export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,512}$/;

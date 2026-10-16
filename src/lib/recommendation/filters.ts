@@ -79,18 +79,3 @@ export function withDistance(
       : cafe,
   );
 }
-
-/**
- * Interim deterministic order until M3 ranking: nearest first, unknown
- * distance last, ties broken by place ID.
- */
-export function orderByDistance(cafes: readonly CafePlace[]): CafePlace[] {
-  return [...cafes].sort((a, b) => {
-    const da = a.distanceMeters ?? Number.POSITIVE_INFINITY;
-    const db = b.distanceMeters ?? Number.POSITIVE_INFINITY;
-    if (da !== db) {
-      return da < db ? -1 : 1;
-    }
-    return a.placeId < b.placeId ? -1 : a.placeId > b.placeId ? 1 : 0;
-  });
-}

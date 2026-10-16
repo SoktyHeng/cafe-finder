@@ -4,7 +4,7 @@ import { useId } from "react";
 
 import type { Purpose } from "@/lib/discovery/request-schema";
 
-import { PURPOSE_OPTIONS } from "../options";
+import { PURPOSE_OPTIONS } from "@/lib/discovery/options";
 
 type PurposePickerProps = {
   value: Purpose;

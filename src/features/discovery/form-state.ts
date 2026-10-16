@@ -1,5 +1,6 @@
 import { roundCoordinate } from "@/lib/geo/distance";
 import type { SearchArea } from "@/lib/locations/cities";
+import type { RelaxationChange } from "@/lib/recommendation/relaxation";
 import {
   RADIUS_METERS,
   type Budget,
@@ -92,4 +93,19 @@ export function toDiscoveryRequest(values: ReadyFormValues): DiscoveryRequest {
     ...(values.preferQuiet && { preferQuiet: true }),
     ...(values.preferWifi && { preferWifi: true }),
   };
+}
+
+/** Applies a one-click relaxation from the empty state to the submitted values. */
+export function applyRelaxation(
+  values: ReadyFormValues,
+  change: RelaxationChange,
+): ReadyFormValues {
+  switch (change.kind) {
+    case "removeMinRating":
+      return { ...values, minRating: undefined };
+    case "includeClosed":
+      return { ...values, openNowOnly: false };
+    case "widenRadius":
+      return { ...values, radiusMeters: change.radiusMeters };
+  }
 }

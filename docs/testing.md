@@ -18,6 +18,15 @@
 - E2E runs a **production build** in fixture mode on port 3100 (`reuseExistingServer` outside CI). E2E must never call Google or Supabase. Upstream APIs are mocked from M2 onward.
 - Default CI must never call Google APIs.
 
+## Recommendation engine tests (M3)
+
+| Test | Covers |
+|---|---|
+| `lib/recommendation/score.test.ts` | Weighted mean and neutral unknowns. Coverage, confidence and the hidden percentage. Bayesian rating. Contradictions (zero-review rating, temporarily closed but open now). Budget wording. Evidence-only Wi-Fi, quiet and atmosphere. Ties and deterministic order. Custom weights. Config validation. Invariants over 2,000 seeded random cafes |
+| `lib/recommendation/relaxation.test.ts` | Only relaxations that help, with counts, radius steps and the maximum |
+| `features/cafes/components/cafe-card.test.tsx` | Match badge, "Limited data", Best match, reasons, cautions, unverified preferences, breakdown table |
+| `tests/e2e/ranking.spec.ts` | Ranked order, percentages, breakdown, Wi-Fi never claimed, one-click relaxation and radius widening |
+
 ## Google integration tests (M2)
 
 Google is never called in tests or CI. `fetch` is injected into `GooglePlacesClient`.

@@ -8,24 +8,54 @@ import { expect, test } from "@playwright/test";
 const GOOGLE_RESPONSE = {
   results: [
     {
-      placeId: "ChIJtestPlace0001",
-      name: "Sample Google-sourced Cafe",
-      latitude: 11.5551,
-      longitude: 104.9262,
-      address: "Test address (mocked response)",
-      rating: 4.5,
-      ratingCount: 87,
-      openNow: true,
-      businessStatus: "operational",
-      googleMapsUri: "https://maps.google.com/?cid=1234567890",
-      distanceMeters: 260,
-      dataSource: "google",
+      cafe: {
+        placeId: "ChIJtestPlace0001",
+        name: "Sample Google-sourced Cafe",
+        latitude: 11.5551,
+        longitude: 104.9262,
+        address: "Test address (mocked response)",
+        rating: 4.5,
+        ratingCount: 87,
+        openNow: true,
+        businessStatus: "operational",
+        googleMapsUri: "https://maps.google.com/?cid=1234567890",
+        distanceMeters: 260,
+        dataSource: "google",
+      },
+      score: 0.8,
+      matchPercent: 80,
+      confidence: "high",
+      coverage: 0.8,
+      factors: [
+        { factor: "rating", weight: 25, score: 0.62 },
+        { factor: "distance", weight: 25, score: 0.91 },
+        { factor: "openNow", weight: 10, score: 1 },
+        { factor: "atmosphere", weight: 15, score: null },
+      ],
+      knownMatchReasons: ["Well rated on Google", "Very close to you", "Open now (according to Google)"],
+      cautions: [],
+      unverifiedPreferences: ["Good for work or study"],
     },
     {
-      placeId: "ChIJtestPlace0002",
-      name: "Second Mocked Cafe",
-      distanceMeters: 900,
-      dataSource: "google",
+      cafe: {
+        placeId: "ChIJtestPlace0002",
+        name: "Second Mocked Cafe",
+        distanceMeters: 900,
+        dataSource: "google",
+      },
+      score: 0.5,
+      matchPercent: null,
+      confidence: "low",
+      coverage: 0.33,
+      factors: [
+        { factor: "rating", weight: 25, score: null },
+        { factor: "distance", weight: 25, score: 0.7 },
+        { factor: "openNow", weight: 10, score: null },
+        { factor: "atmosphere", weight: 15, score: null },
+      ],
+      knownMatchReasons: ["Close to you"],
+      cautions: ["No ratings yet", "Opening hours unknown"],
+      unverifiedPreferences: ["Good for work or study"],
     },
   ],
   searchedAt: "2026-10-16T00:00:00.000Z",
@@ -54,6 +84,8 @@ test("Google results show attribution, sources and Maps links", async ({ page })
   await expect(first).toContainText("4.5 Google rating from 87 reviews");
   await expect(first).toContainText("Open now (according to Google)");
   await expect(first).not.toContainText("Demo data");
+  await expect(first.getByTestId("match-badge")).toHaveText("80% matchHigh confidence");
+  await expect(first.getByText("Best match")).toBeVisible();
   await expect(first.getByRole("link", { name: /open in google maps/i })).toHaveAttribute(
     "href",
     "https://maps.google.com/?cid=1234567890",
@@ -62,6 +94,7 @@ test("Google results show attribution, sources and Maps links", async ({ page })
   const sparse = page.getByRole("article", { name: "Second Mocked Cafe" });
   await expect(sparse).toContainText("No rating yet");
   await expect(sparse).toContainText("Opening hours unknown");
+  await expect(sparse.getByTestId("match-badge")).toHaveText("Limited data");
   await expect(sparse.getByRole("link")).toHaveCount(0);
 });
 

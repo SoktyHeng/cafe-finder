@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M2 (Google Places live provider) complete.** Live search uses Places API (New) when `PLACES_PROVIDER=google` and a server key are set. Without keys the app runs on clearly labelled **fictional fixture cafes**. See [docs/milestones.md](docs/milestones.md).
+> **Status: M3 (ranking and filters) complete.** Cafes are ranked by a configurable, explainable score covering rating, distance, opening status, budget fit and unverified preferences. Live data uses Places API (New) when `PLACES_PROVIDER=google` and a server key are set. Without keys the app runs on clearly labelled **fictional fixture cafes**. See [docs/milestones.md](docs/milestones.md) and [docs/recommendation-scoring.md](docs/recommendation-scoring.md).
 
 ## Stack
 
@@ -79,7 +79,7 @@ src/
   lib/discovery/       discovery request schema (shared client/server)
   lib/google/          server-only Places API (New) client, field masks, error mapping
   lib/places/          DTOs, PlacesProvider, Google + fixture providers, normalization
-  lib/recommendation/  hard filters and interim ordering
+  lib/recommendation/  hard filters, weighted scoring, explanations, relaxation
   lib/security/        error contract, rate limits, URL allowlists
   lib/geo/ lib/locations/ lib/observability/
 tests/e2e/             Playwright specs (smoke, discovery, accessibility)
@@ -93,7 +93,7 @@ Folders for later milestones (`lib/supabase/`, `supabase/` and others) are creat
 - Live mode needs your own Google key. CI and E2E use fixtures and mocked responses only.
 - Rate limits are in memory, per server instance. Google Cloud quotas are the hard ceiling.
 - Place details and photos are available through the API, but the details page and photo display arrive in M4.
-- Results are ordered by straight-line distance. Explainable ranking arrives in M3.
+- Atmosphere, Wi-Fi and quietness have no data source until community reports (M6). They count as neutral and are shown as "not verified". The scoring weights are initial hypotheses, not yet calibrated.
 - Budget, Wi-Fi, quietness and purpose fit can't be verified yet. They are shown as "not verified" and never filter results.
 - Manual location means choosing one of the approximate Phnom Penh areas. There is no address search or map yet (M4).
 - There is no map, cafe details page or directions yet (M4).

@@ -5,7 +5,7 @@ import {
   PlacesProviderUnavailableError,
   type PlacesProvider,
 } from "@/lib/places/provider";
-import { nearbySearchResponseSchema } from "@/lib/places/schemas";
+import { nearbySearchResponseSchema } from "@/lib/discovery/response-schema";
 import { apiErrorBodySchema } from "@/lib/security/api-error";
 import { FixedWindowRateLimiter } from "@/lib/security/rate-limit";
 import { createRequestGuard, type RequestGuard } from "@/lib/security/request-guard";
@@ -71,9 +71,10 @@ describe("POST /api/places/nearby", () => {
     expect(body.coverageNote).toMatch(/not an exhaustive list/);
     expect(body.results.length).toBeGreaterThan(0);
 
-    const distances = body.results.map((cafe) => cafe.distanceMeters ?? Infinity);
-    expect(distances).toEqual([...distances].sort((a, b) => a - b));
-    expect(body.results.every((cafe) => cafe.dataSource === "fixture")).toBe(true);
+    const scores = body.results.map((result) => result.score);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(body.results.every((result) => result.cafe.dataSource === "fixture")).toBe(true);
+    expect(body.results.every((result) => result.unverifiedPreferences.includes("Good for work or study"))).toBe(true);
   });
 
   it("applies hard filters and reports what was excluded", async () => {
@@ -82,12 +83,12 @@ describe("POST /api/places/nearby", () => {
     );
     const body = nearbySearchResponseSchema.parse(await response.json());
 
-    for (const cafe of body.results) {
+    for (const { cafe } of body.results) {
       expect(cafe.openNow).not.toBe(false);
       if (cafe.rating !== undefined) expect(cafe.rating).toBeGreaterThanOrEqual(4.5);
     }
     // The fixture set has an unrated cafe and one with unknown hours nearby.
-    expect(body.results.some((cafe) => cafe.rating === undefined)).toBe(true);
+    expect(body.results.some(({ cafe }) => cafe.rating === undefined)).toBe(true);
     expect(body.excluded.permanentlyClosed).toBeGreaterThan(0);
   });
 
@@ -247,7 +248,7 @@ describe("POST /api/places/nearby", () => {
       await (await makeHandler({ provider })(post(VALID_BODY))).json(),
     );
     expect(body.source).toBe("google");
-    expect(body.results.map((cafe) => cafe.placeId)).toEqual(["ChIJa"]);
+    expect(body.results.map((result) => result.cafe.placeId)).toEqual(["ChIJa"]);
     expect(body.attributions).toEqual([{ provider: "Example Data Co" }]);
   });
 });
