@@ -103,9 +103,9 @@ After filtering, results are ranked by score, then distance, then place ID (M3).
 - `503 UPSTREAM_UNAVAILABLE`: Google is down, timed out, over quota, rejected the key, or returned an unexpected body. The public message is generic, and the reason is only logged.
 - `500 INTERNAL_ERROR`: an unexpected failure, logged as `{"event":"nearby_search_failed","errorName":…}` with no coordinates.
 
-## `GET /api/places/[placeId]` (M2)
+## `GET /api/places/[placeId]` (M2, reviews and amenities M4)
 
-Implementation: [src/app/api/places/[placeId]/handler.ts](../src/app/api/places/%5BplaceId%5D/handler.ts). Details are fetched on demand with the narrow details field mask. No UI calls this endpoint until M4.
+Implementation: [src/app/api/places/[placeId]/handler.ts](../src/app/api/places/%5BplaceId%5D/handler.ts). Details are fetched on demand with the details field mask, once per opened `/cafes/[placeId]` page.
 
 - `placeId` must contain only letters, digits, `_` and `-`, up to 512 characters. Otherwise the response is `400`.
 - `200` returns `{ place, fetchedAt, source, attributions }`. `place` is a `CafePlace` plus:
@@ -113,7 +113,9 @@ Implementation: [src/app/api/places/[placeId]/handler.ts](../src/app/api/places/
   - optional `utcOffsetMinutes`;
   - optional `websiteUri`, http or https only;
   - optional `phoneNumber`;
-  - required `photos`, up to 5, each `{ name, widthPx?, heightPx?, authorAttributions: [{ displayName, uri? }] }`.
+  - required `photos`, up to 5, each `{ name, widthPx?, heightPx?, authorAttributions: [{ displayName, uri? }] }`;
+  - required `reviews`, up to 5 Google reviews, each `{ authorName, authorUri?, authorPhotoUri?, rating?, relativePublishTime?, publishTime?, text?, translated, googleMapsUri? }`. Author attribution is required for display;
+  - required `amenities`, Google's answers as `{ dineIn?: boolean, outdoorSeating?: boolean, wheelchairAccessibleEntrance?: boolean, acceptsCreditCards?: boolean, … }`. A missing key means Google doesn't list it. There are never Wi-Fi or noise fields.
 - `404 NOT_FOUND` for unknown IDs, `429` when rate-limited, `503` for an upstream failure.
 - Photo `name` values are short-lived and must not be stored. Author attributions must be displayed with each photo.
 

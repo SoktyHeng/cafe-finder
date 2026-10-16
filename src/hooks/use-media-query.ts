@@ -1,0 +1,23 @@
+"use client";
+
+import { useCallback, useSyncExternalStore } from "react";
+
+/** `false` during SSR and the first client render, then the live match. */
+export function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (typeof window === "undefined" || !window.matchMedia) return () => {};
+      const media = window.matchMedia(query);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia(query).matches : false),
+    () => false,
+  );
+}
+
+export const WIDE_LAYOUT_QUERY = "(min-width: 1280px)";

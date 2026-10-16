@@ -98,7 +98,7 @@ describe("GooglePlacesProvider.getPlaceDetails", () => {
       fakeClient({ getPlace: async () => ({ id: "ChIJx", displayName: { text: "X" } }) }),
     );
     expect(await provider.getPlaceDetails("ChIJx")).toEqual({
-      place: { placeId: "ChIJx", name: "X", dataSource: "google", photos: [] },
+      place: { placeId: "ChIJx", name: "X", dataSource: "google", photos: [], reviews: [], amenities: {} },
       attributions: [],
     });
   });

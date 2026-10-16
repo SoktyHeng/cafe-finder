@@ -18,6 +18,19 @@
 - E2E runs a **production build** in fixture mode on port 3100 (`reuseExistingServer` outside CI). E2E must never call Google or Supabase. Upstream APIs are mocked from M2 onward.
 - Default CI must never call Google APIs.
 
+## Maps and details tests (M4)
+
+The Maps JavaScript API can't run in jsdom or CI without a key, so it is never loaded in tests.
+
+| Test | Covers |
+|---|---|
+| `features/discovery/components/results-with-map.test.tsx` | `@vis.gl/react-google-maps` mocked: list-first and lazy loading on mobile, markers and origin pin, marker → card (highlight, scroll, focus), card → marker (pan, `aria-pressed`), map kept mounted, missing key / `AUTH_FAILURE` / `FAILED` fallbacks, fit-bounds once |
+| `features/cafes/components/cafe-details-view.test.tsx` | Facts, attribution, directions, website and phone links. One photo then more on request, with credits. Reviews with author attribution and a translation notice. Amenities yes/no/not listed and no Wi-Fi. Hours. Demo, loading, 404, invalid ID (no fetch), error and retry. Safe back links |
+| `lib/google/maps-urls.test.ts`, `features/cafes/opening-hours.test.ts` | Directions URL encoding, no origin, none for demo cafes. Today's hours in the cafe's timezone, matched by weekday name |
+| `lib/places/google-normalize.test.ts` | Review and amenity normalization, including unsafe links, missing authors, the 5-review cap and Wi-Fi never invented |
+| `tests/e2e/details.spec.ts` | Results → details → back. Demo labelling. Mocked Google details (photos, credits, reviews, hours, amenities, links). Error and retry. Map fallback on desktop and mobile. No Maps request without a key. axe scans |
+| Manual live checks | `pnpm smoke:live` (details with reviews and amenities). Rendering the real details page in a browser. The map with a real browser key (see [deployment.md](deployment.md)) |
+
 ## Recommendation engine tests (M3)
 
 | Test | Covers |
@@ -52,7 +65,7 @@ Google is never called in tests or CI. `fetch` is injected into `GooglePlacesCli
 | `api.spec.ts` | Real server in fixture mode: nearby, details, 404, photo validation |
 
 - Upstream failures and Google-sourced results are simulated with `page.route()` on `/api/places/nearby`. Fixture mode needs no network access.
-- The E2E server raises the rate limits, because every test comes from one client.
+- The E2E server raises the rate limits, because every test comes from one client, and sets an empty `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`, so the map fallback is exercised and Google Maps is never loaded.
 - Geolocation uses Playwright's `grantPermissions`, `setGeolocation` and `clearPermissions`. No real position is used.
 
 ## First-time setup

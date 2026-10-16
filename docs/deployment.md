@@ -10,8 +10,14 @@ This covers the M2 scope: Google Places configuration. The production checklist 
    - API restriction: **Places API (New)** only.
    - Application restriction: IP addresses where the host has stable egress IPs. Most serverless hosts, including standard Vercel, don't, so rely on the API restriction, quotas and the fact that the key never leaves the server.
    - Never prefix it with `NEXT_PUBLIC_`. Store it only in the host's secret store or `.env.local`, which is git-ignored.
-4. The browser Maps key (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`) is not used until M4. When added, restrict it by HTTP referrer and to the Maps JavaScript API only.
-5. Set **quotas** under APIs & Services → Places API (New) → Quotas: requests per minute and per day for Nearby Search, Place Details and Place Photo, sized to expected traffic.
+4. Create a **separate browser key** (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`) for the map (M4):
+   - Application restriction: **Websites (HTTP referrers)**, for example `http://localhost:3000/*` for local development and `https://your-domain/*` for production.
+   - API restriction: **Maps JavaScript API** only.
+   - It ships to every visitor by design. The server refuses to start if it equals a server key.
+   - Optional: create a **Map ID** (Google Cloud → Map Management, JavaScript, Vector) and set `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID`. Without one, Google's `DEMO_MAP_ID` is used, which is fine for development only.
+   - `NEXT_PUBLIC_*` values are inlined at build time, so **rebuild after changing them**.
+   - Without a browser key, the site shows "Map not available" and the list and directions keep working.
+5. Set **quotas** under APIs & Services → Places API (New) → Quotas: requests per minute and per day for Nearby Search, Place Details and Place Photo, sized to expected traffic. Also set a daily quota for Maps JavaScript API map loads.
 6. Set a **billing budget with alerts**, for example at 50%, 90% and 100%. Budgets alert but do not cap spending, so the quotas are the hard limit.
 
 ## Application configuration
@@ -45,7 +51,13 @@ pnpm build && pnpm start          # or: pnpm dev
 pnpm smoke:live                   # separate terminal. Billable: about 3 requests
 ```
 
-`pnpm smoke:live` checks that live search returns Google-sourced cafes, that details load, and that the photo endpoint redirects to a Google image host. It only calls this app's API and never reads the key.
+`pnpm smoke:live` checks that live search returns Google-sourced cafes, that details load with reviews and amenities, and that the photo endpoint redirects to a Google image host. It only calls this app's API and never reads the key.
+
+**Map check (manual, after setting a browser key):** open `/discover?area=bkk1&purpose=work&radius=3000` at desktop width.
+- Numbered markers and a blue search-centre pin appear, and the map frames them.
+- Clicking a marker highlights and scrolls to its card. "Show on map" on a card pans to its marker.
+- Google's logo and attribution are visible.
+- At phone width, the List/Map toggle works and the map loads only when Map is chosen.
 
 ## Monitoring
 

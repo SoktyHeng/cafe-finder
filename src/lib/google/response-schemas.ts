@@ -34,6 +34,36 @@ export const googleOpeningHoursSchema = z.object({
   weekdayDescriptions: z.array(z.string()).optional(),
 });
 
+export const googleReviewSchema = z.object({
+  rating: z.number().optional(),
+  relativePublishTimeDescription: z.string().optional(),
+  publishTime: z.string().optional(),
+  text: googleLocalizedTextSchema.optional(),
+  originalText: googleLocalizedTextSchema.optional(),
+  authorAttribution: googleAuthorAttributionSchema.optional(),
+  googleMapsUri: z.string().optional(),
+  flagContentUri: z.string().optional(),
+});
+
+export const GOOGLE_AMENITY_FIELDS = [
+  "dineIn",
+  "takeout",
+  "delivery",
+  "outdoorSeating",
+  "goodForGroups",
+  "goodForChildren",
+  "reservable",
+  "restroom",
+  "servesBreakfast",
+  "servesCoffee",
+  "servesDessert",
+  "servesVegetarianFood",
+  "allowsDogs",
+  "liveMusic",
+] as const;
+
+const optionalBoolean = z.boolean().optional();
+
 export const googlePlaceSchema = z.object({
   id: z.string(),
   displayName: googleLocalizedTextSchema.optional(),
@@ -51,6 +81,27 @@ export const googlePlaceSchema = z.object({
   currentOpeningHours: googleOpeningHoursSchema.optional(),
   websiteUri: z.string().optional(),
   nationalPhoneNumber: z.string().optional(),
+  reviews: z.array(z.unknown()).optional(),
+  accessibilityOptions: z
+    .object({ wheelchairAccessibleEntrance: optionalBoolean, wheelchairAccessibleSeating: optionalBoolean })
+    .optional(),
+  paymentOptions: z
+    .object({ acceptsCreditCards: optionalBoolean, acceptsNfc: optionalBoolean, acceptsCashOnly: optionalBoolean })
+    .optional(),
+  dineIn: optionalBoolean,
+  takeout: optionalBoolean,
+  delivery: optionalBoolean,
+  outdoorSeating: optionalBoolean,
+  goodForGroups: optionalBoolean,
+  goodForChildren: optionalBoolean,
+  reservable: optionalBoolean,
+  restroom: optionalBoolean,
+  servesBreakfast: optionalBoolean,
+  servesCoffee: optionalBoolean,
+  servesDessert: optionalBoolean,
+  servesVegetarianFood: optionalBoolean,
+  allowsDogs: optionalBoolean,
+  liveMusic: optionalBoolean,
 });
 
 export type GooglePlace = z.infer<typeof googlePlaceSchema>;

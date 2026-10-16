@@ -1,6 +1,6 @@
 # Architecture
 
-The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M3).
+The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M4).
 
 ```text
 Browser
@@ -9,7 +9,10 @@ Browser
                    ├─ URL search params ⇄ form values      features/discovery/url-state.ts
                    ├─ useNearbySearch (one call per submitted search)
                    │     └─ POST /api/places/nearby
-                   └─ ResultsPanel → CafeCard
+                   └─ ResultsPanel → ResultsWithMap ─┬─ CafeCard (Details · Directions · Show on map)
+                                                     └─ CafeMap (lazy; Maps JS API, browser key)
+ /cafes/[placeId] CafeDetailsView (client, inside Suspense)
+                   └─ usePlaceDetails → GET /api/places/[placeId] → photos (/api/places/photo), hours, amenities, reviews
 Server
  └─ /api/places/nearby  handler.ts
        ├─ Zod: discoveryRequestSchema               lib/discovery/
@@ -46,7 +49,10 @@ Server
 | `lib/locations/cities.ts` | Manually selectable areas per city (approximate centres). Add cities here |
 | `lib/security/api-error.ts` | Error contract |
 | `features/discovery/` | Form state, URL state, API client, hooks (`useGeolocation`, `useNearbySearch`) and components |
-| `features/cafes/` | Cafe card, match badge and explanation, display formatting |
+| `features/cafes/` | Cafe card, match explanation, map (`cafe-map.tsx`, `map-unavailable.tsx`), details page (`cafe-details-view.tsx`, `photo-gallery.tsx`, `reviews-list.tsx`, `amenities-list.tsx`, `opening-hours-list.tsx`), formatting |
+| `features/discovery/components/results-with-map.tsx` | List and map layout, List/Map toggle, two-way selection |
+| `lib/google/maps-urls.ts` | Official, key-free Google Maps directions links |
+| `lib/http/request-api.ts`, `hooks/use-keyed-request.ts` | Typed API calls that never throw, and deduplicated one-call-per-action requests (shared by search and details) |
 
 ## Key decisions
 
@@ -55,7 +61,9 @@ Server
 - **Provider boundary.** The UI, route handlers and filters depend only on the normalized DTOs. Google response shapes stay in `lib/google/` and the Google provider. Providers expose `searchNearby`, `getPlaceDetails` and `getPhotoUrl`.
 - **Live data, no caching.** Google content is fetched per request and returned with `no-store`. See [google-maps-compliance.md](google-maps-compliance.md).
 - **Error boundaries.** `app/error.tsx` and `app/global-error.tsx` (M0) handle render errors. Search failures are handled in the UI as states.
-- **Rendering.** `/` and `/discover` are prerendered shells. `/discover` reads search params on the client inside `<Suspense>`, as Cache Components require.
+- **Rendering.** `/` and `/discover` are prerendered shells. `/discover` and `/cafes/[placeId]` read URL state on the client inside `<Suspense>`, as Cache Components require. The details page doesn't fetch on the server, so there's no second billable details call for metadata.
+- **Map lifecycle.** The Maps JavaScript API loads only when a map is first shown: always on wide screens, after "Map" is chosen on narrow ones. The map is then kept mounted. Selection changes only pan the map and restyle markers. A new search remounts the view, which resets selection and framing. Without a key, or on a load or auth failure, the map is replaced by a fallback and the list keeps working.
+- **Key separation.** The public browser key (Maps JavaScript API) and the server key (Places) are distinct. `instrumentation.ts` refuses to start if they're equal.
 
 ## Deviations from CLAUDE.md
 

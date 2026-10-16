@@ -94,6 +94,58 @@ export type PlacePhoto = z.infer<typeof placePhotoSchema>;
 /** Max photos returned per place; each one shown costs a Place Photo request. */
 export const MAX_DETAIL_PHOTOS = 5;
 
+/** Google returns at most 5 reviews per place. */
+export const MAX_REVIEWS = 5;
+
+/**
+ * Google-reported attributes shown on the details page. `true`/`false` are
+ * Google's answer; a missing key means Google doesn't list it (unknown).
+ * Wi-Fi and noise level are not Google fields at all.
+ */
+export const AMENITY_KEYS = [
+  "dineIn",
+  "takeout",
+  "delivery",
+  "outdoorSeating",
+  "goodForGroups",
+  "goodForChildren",
+  "reservable",
+  "restroom",
+  "servesBreakfast",
+  "servesCoffee",
+  "servesDessert",
+  "servesVegetarianFood",
+  "allowsDogs",
+  "liveMusic",
+  "wheelchairAccessibleEntrance",
+  "wheelchairAccessibleSeating",
+  "acceptsCreditCards",
+  "acceptsNfc",
+  "acceptsCashOnly",
+] as const;
+export type AmenityKey = (typeof AMENITY_KEYS)[number];
+
+export const amenitiesSchema = z.partialRecord(z.enum(AMENITY_KEYS), z.boolean());
+export type Amenities = z.infer<typeof amenitiesSchema>;
+
+/**
+ * A Google review, displayed as provided with mandatory author attribution.
+ * Never stored, never mixed with Cafe Finder community content.
+ */
+export const placeReviewSchema = z.strictObject({
+  authorName: z.string().min(1),
+  authorUri: z.url({ protocol: /^https$/ }).optional(),
+  authorPhotoUri: z.url({ protocol: /^https$/ }).optional(),
+  rating: z.number().min(1).max(5).optional(),
+  relativePublishTime: z.string().optional(),
+  publishTime: z.iso.datetime().optional(),
+  text: z.string().optional(),
+  /** True when Google translated the text from another language. */
+  translated: z.boolean(),
+  googleMapsUri: z.url({ protocol: /^https$/ }).optional(),
+});
+export type PlaceReview = z.infer<typeof placeReviewSchema>;
+
 export const cafeDetailsSchema = cafePlaceSchema.extend({
   /** Human-readable weekly hours as provided by the source, in the place's local time. */
   weekdayDescriptions: z.array(z.string()).max(7).optional(),
@@ -101,6 +153,8 @@ export const cafeDetailsSchema = cafePlaceSchema.extend({
   websiteUri: z.url({ protocol: /^https?$/ }).optional(),
   phoneNumber: z.string().max(64).optional(),
   photos: z.array(placePhotoSchema).max(MAX_DETAIL_PHOTOS),
+  reviews: z.array(placeReviewSchema).max(MAX_REVIEWS),
+  amenities: amenitiesSchema,
 });
 
 export type CafeDetails = z.infer<typeof cafeDetailsSchema>;

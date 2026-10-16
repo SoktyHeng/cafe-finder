@@ -6,7 +6,7 @@ import type { DiscoveryRequest } from "@/lib/discovery/request-schema";
 import { TEST_REQUEST, nearbyResponse, testCafe } from "@/test/recommendations";
 
 import type { NearbySearchState } from "../hooks/use-nearby-search";
-import { ResultsPanel, describeExclusions } from "./results-panel";
+import { ResultsPanel, cafeDetailsHref, describeExclusions } from "./results-panel";
 
 const REQUEST: DiscoveryRequest = { ...TEST_REQUEST, minRating: 4.5, preferWifi: true };
 
@@ -22,6 +22,9 @@ function renderPanel(state: NearbySearchState, request: DiscoveryRequest = REQUE
       state={state}
       request={request}
       locationLabel="BKK1"
+      origin={{ latitude: 11.553, longitude: 104.925 }}
+      backQuery="area=bkk1&purpose=work&radius=3000"
+      mapConfig={{ apiKey: undefined, mapId: "DEMO_MAP_ID" }}
       maxRadiusMeters={15_000}
       onRetry={onRetry}
       onEditSearch={onEditSearch}
@@ -57,6 +60,10 @@ describe("ResultsPanel", () => {
     expect(screen.getByText(/can.t verify count as neutral/)).toBeInTheDocument();
     expect(screen.getByTestId("demo-results-notice")).toBeInTheDocument();
     expect(cardNames()).toEqual(["Near", "Far"]);
+    expect(screen.getByRole("link", { name: /details: near/i })).toHaveAttribute(
+      "href",
+      "/cafes/fixture-001?from=area%3Dbkk1%26purpose%3Dwork%26radius%3D3000",
+    );
     expect(screen.getAllByText("Wi-Fi")).toHaveLength(2);
   });
 
@@ -134,6 +141,13 @@ describe("ResultsPanel", () => {
     } else {
       expect(retry).not.toBeInTheDocument();
     }
+  });
+});
+
+describe("cafeDetailsHref", () => {
+  it("encodes the place ID and the originating search", () => {
+    expect(cafeDetailsHref("ChIJ_a-1", "area=bkk1&radius=3000")).toBe("/cafes/ChIJ_a-1?from=area%3Dbkk1%26radius%3D3000");
+    expect(cafeDetailsHref("ChIJ_a-1", "")).toBe("/cafes/ChIJ_a-1");
   });
 });
 

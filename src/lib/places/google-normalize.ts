@@ -1,22 +1,28 @@
 import {
+  GOOGLE_AMENITY_FIELDS,
   googlePlaceSchema,
+  googleReviewSchema,
   type GooglePlace,
 } from "@/lib/google/response-schemas";
 import {
   safeGoogleMapsUrl,
+  safeGooglePhotoUrl,
   safeHttpsUrl,
   safeWebUrl,
 } from "@/lib/security/safe-url";
 
 import {
   MAX_DETAIL_PHOTOS,
+  MAX_REVIEWS,
   PHOTO_NAME_PATTERN,
   PLACE_ID_PATTERN,
+  type Amenities,
   type BusinessStatus,
   type CafeDetails,
   type CafePlace,
   type DataProviderAttribution,
   type PlacePhoto,
+  type PlaceReview,
   type PriceLevel,
 } from "./schemas";
 
@@ -113,6 +119,62 @@ function normalizePhotos(place: GooglePlace): PlacePhoto[] {
     }));
 }
 
+/** Reviews keep Google's wording; only unsafe links and malformed entries are dropped. */
+function normalizeReviews(place: GooglePlace): PlaceReview[] {
+  const reviews: PlaceReview[] = [];
+  for (const raw of place.reviews ?? []) {
+    const parsed = googleReviewSchema.safeParse(raw);
+    const authorName = parsed.success ? parsed.data.authorAttribution?.displayName?.trim() : undefined;
+    // Attribution is mandatory: a review without an author is not shown.
+    if (!parsed.success || !authorName) continue;
+    const review = parsed.data;
+    // Normalized to millisecond ISO (Google may send nanoseconds).
+    const publishTime =
+      review.publishTime && !Number.isNaN(Date.parse(review.publishTime))
+        ? new Date(review.publishTime).toISOString()
+        : undefined;
+    const authorUri = safeHttpsUrl(review.authorAttribution?.uri);
+    const authorPhotoUri = safeGooglePhotoUrl(review.authorAttribution?.photoUri);
+    const googleMapsUri = safeGoogleMapsUrl(review.googleMapsUri);
+    const text = review.text?.text.trim();
+    reviews.push({
+      authorName,
+      ...(authorUri && { authorUri }),
+      ...(authorPhotoUri && { authorPhotoUri }),
+      ...(review.rating !== undefined && review.rating >= 1 && review.rating <= 5 && { rating: review.rating }),
+      ...(review.relativePublishTimeDescription && { relativePublishTime: review.relativePublishTimeDescription }),
+      ...(publishTime && { publishTime }),
+      ...(text && { text }),
+      translated:
+        review.text?.languageCode !== undefined &&
+        review.originalText?.languageCode !== undefined &&
+        review.text.languageCode !== review.originalText.languageCode,
+      ...(googleMapsUri && { googleMapsUri }),
+    });
+    if (reviews.length === MAX_REVIEWS) break;
+  }
+  return reviews;
+}
+
+function normalizeAmenities(place: GooglePlace): Amenities {
+  const amenities: Amenities = {};
+  for (const field of GOOGLE_AMENITY_FIELDS) {
+    const value = place[field];
+    if (typeof value === "boolean") amenities[field] = value;
+  }
+  const nested = {
+    wheelchairAccessibleEntrance: place.accessibilityOptions?.wheelchairAccessibleEntrance,
+    wheelchairAccessibleSeating: place.accessibilityOptions?.wheelchairAccessibleSeating,
+    acceptsCreditCards: place.paymentOptions?.acceptsCreditCards,
+    acceptsNfc: place.paymentOptions?.acceptsNfc,
+    acceptsCashOnly: place.paymentOptions?.acceptsCashOnly,
+  } as const;
+  for (const [key, value] of Object.entries(nested) as [keyof typeof nested, boolean | undefined][]) {
+    if (typeof value === "boolean") amenities[key] = value;
+  }
+  return amenities;
+}
+
 /** Parses one raw place; returns `undefined` if it lacks a usable ID. */
 export function parseGooglePlace(raw: unknown): GooglePlace | undefined {
   const parsed = googlePlaceSchema.safeParse(raw);
@@ -138,6 +200,8 @@ export function normalizePlaceDetails(place: GooglePlace): CafeDetails {
     ...(websiteUri && { websiteUri }),
     ...(phoneNumber && phoneNumber.length <= 64 && { phoneNumber }),
     photos: normalizePhotos(place),
+    reviews: normalizeReviews(place),
+    amenities: normalizeAmenities(place),
   };
 }
 

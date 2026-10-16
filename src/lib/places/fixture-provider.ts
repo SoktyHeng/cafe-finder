@@ -42,7 +42,9 @@ export class FixturePlacesProvider implements PlacesProvider {
 
   async getPlaceDetails(placeId: string): Promise<PlaceDetailsResult | null> {
     const cafe = this.cafes.find((candidate) => candidate.placeId === placeId);
-    return cafe ? { place: { ...cafe, photos: [] }, attributions: [] } : null;
+    return cafe
+      ? { place: { ...cafe, photos: [], reviews: [], amenities: {} }, attributions: [] }
+      : null;
   }
 
   async getPhotoUrl(_photoName: string, _maxWidthPx: PhotoWidth): Promise<string | null> {

@@ -2,15 +2,17 @@
 
 Last reviewed: **2026-10-16**, against the official pages listed at the end. Re-check them before changing field masks, adding caching, adding a map, or launching.
 
-## APIs in use (M2)
+## APIs in use (M2–M4)
 
 | Feature | API | Called from | Billing SKU (highest field in the mask) |
 |---|---|---|---|
 | Discovery search | Nearby Search (New), `POST places:searchNearby` | Server (`/api/places/nearby`) | **Nearby Search Enterprise** |
-| Place details | Place Details (New), `GET places/{id}` | Server (`/api/places/[placeId]`) | **Place Details Enterprise** |
-| Photos | Place Photos (New), `GET {photo}/media?skipHttpRedirect=true` | Server (`/api/places/photo`) | Place Photo, per photo requested |
+| Place details | Place Details (New), `GET places/{id}` | Server (`/api/places/[placeId]`), once per opened details page | **Place Details Enterprise + Atmosphere** (reviews and amenities, M4) |
+| Photos | Place Photos (New), `GET {photo}/media?skipHttpRedirect=true` | Server (`/api/places/photo`) | Place Photo, per photo **displayed**. The details page loads 1 photo and the rest only on request |
+| Map | Maps JavaScript API (`@vis.gl/react-google-maps` 1.10.1) | Browser, with a separate referrer-restricted key | Dynamic Maps, per map load. Lazy: loaded only when the map is shown |
+| Directions | Maps URLs (`google.com/maps/dir/?api=1`) | Browser link | None. Maps URLs need no key and are not billed |
 
-No Google API is called from the browser. The details endpoint is built and tested, but no UI calls it until M4.
+The only Google API the browser calls directly is the Maps JavaScript API, with the public browser key. All Places Web Service calls are made by the server.
 
 ## Field masks
 
@@ -18,14 +20,17 @@ Masks are defined in [src/lib/google/field-masks.ts](../src/lib/google/field-mas
 
 **Nearby Search:** `places.id, displayName, location, shortFormattedAddress, businessStatus, googleMapsUri, attributions, rating, userRatingCount, priceLevel, currentOpeningHours`
 
-**Place Details:** `id, displayName, location, formattedAddress, businessStatus, googleMapsUri, attributions, photos, utcOffsetMinutes, rating, userRatingCount, priceLevel, currentOpeningHours, websiteUri, nationalPhoneNumber`
+**Place Details:** `id, displayName, location, formattedAddress, businessStatus, googleMapsUri, attributions, photos, utcOffsetMinutes, rating, userRatingCount, priceLevel, currentOpeningHours, websiteUri, nationalPhoneNumber, accessibilityOptions`, plus the Atmosphere fields `reviews, dineIn, takeout, delivery, outdoorSeating, goodForGroups, goodForChildren, reservable, restroom, servesBreakfast, servesCoffee, servesDessert, servesVegetarianFood, allowsDogs, liveMusic, paymentOptions`
 
 ### Cost decision: Enterprise tier
 
 `rating`, `userRatingCount`, `priceLevel` and `currentOpeningHours` are Enterprise fields. Requesting any one of them bills the whole request at Enterprise. Rating and open-now power the core filters (CLAUDE.md §7), so Enterprise is the floor for search.
 
+**Details at Enterprise + Atmosphere (M4).** Reviews were requested for the details page, and they are Atmosphere fields. Once a request is billed at Atmosphere, the amenity booleans cost nothing extra, so they're included as genuine Google evidence for the details page. This applies only to details (one call per opened page). **Search stays at Enterprise**, and a test enforces that.
+
 Excluded on purpose:
-- **Atmosphere fields** (`reviews`, `servesCoffee`, `goodForGroups`, `editorialSummary` and similar): they cost more, and reviews raise extra display and attribution duties.
+- **Atmosphere fields in Nearby Search**: they would raise the price of every search.
+- **AI summaries** (`editorialSummary`, `generativeSummary`, `reviewSummary`): a separate product and policy decision.
 - **`places.photos` in Nearby Search**: the field is free at Pro, but showing a photo per card would add up to 20 Place Photo calls per search.
 
 A future option is a Pro-only "browse" mask without rating or hours. That would need product sign-off, because the rating and open-now filters would then show "unknown".
@@ -46,7 +51,8 @@ Field-mask subpaths such as `currentOpeningHours.openNow` are not documented, so
 - Google content is **not cached or persisted**. Every response is fetched per request and sent with `Cache-Control: no-store`. Nothing is written to a database.
 - Place IDs may be stored indefinitely (policy exemption). From M5 they will be the only stored Google data.
 - Photo names are never cached ("You cannot cache a photo name"). The photo endpoint resolves a fresh name each time and redirects with `no-store`. An expired name returns 404 so the client can refetch details.
-- Latitude and longitude from Google are used only within a request, for straight-line distance.
+- Latitude and longitude from Google are used only within a request, for straight-line distance and map markers.
+- Photos are shown with plain `<img>` tags pointing at our photo endpoint, not `next/image`, which would fetch and cache Google content on our server. Reviews and photos are never stored.
 
 ## Attribution and branding
 
@@ -54,9 +60,11 @@ Field-mask subpaths such as `currentOpeningHours.openNow` are not documented, so
 |---|---|
 | Places data without a Google map must carry Google Maps attribution. The logo is preferred, and the text "Google Maps" is acceptable where space is limited | Google-sourced results show **"Google Maps"** text at the top of the results container. It uses Roboto 400, 12px, colour `#5E5E5E` on a cream background (contrast above 4.5:1), `translate="no"`, and never wraps. Source: [google-maps-attribution.tsx](../src/components/google-maps-attribution.tsx) |
 | Third-party data providers must be named alongside "Google Maps" | `places.attributions` (a Pro field) is requested, de-duplicated, and rendered as "Google Maps · Data: Provider…" with links when provided |
-| Users must be able to see the source on Google Maps | Each card links to its `googleMapsUri` ("Open in Google Maps"). The link host is allowlisted |
-| Photo author credit wherever a photo is shown | The details DTO carries `authorAttributions` (name and profile link) for every photo. **M4 must render these with each photo.** Thumbnails may omit them only if a larger version with credit is reachable |
-| Places data on a map must use a Google Map | No map yet. M4 must use the Maps JavaScript API only |
+| Users must be able to see the source on Google Maps | Cards link to official directions (`destination_place_id`). The details page has "Open in Google Maps" (`googleMapsUri`, host allowlisted), a "View on Google Maps" link per review, and "See all reviews on Google Maps" |
+| Photo author credit wherever a photo is shown | Every displayed photo has a caption "Photo: Author", linked to the profile when Google gives one ([photo-gallery.tsx](../src/features/cafes/components/photo-gallery.tsx)) |
+| Review author credit (name, photo, profile link) | Each review shows the author's name (linked), their photo, rating and relative time, plus "Translated by Google" when the text was translated. Review text is shown unedited, under "Reviews from Google" ([reviews-list.tsx](../src/features/cafes/components/reviews-list.tsx)). Reviews without an author are dropped |
+| Places data on a map must use a Google Map | The map is Maps JavaScript API only, with Google's own logo, attribution and controls left visible and uncovered. No other basemap is used |
+| Attribution when the map isn't shown | The list and details page keep the "Google Maps" text attribution, because on small screens the list is often shown without the map |
 | No Google content mixed into our own ratings | Ratings are always labelled "Google rating". Community data (M6) stays separate |
 
 **Follow-up before production:** use the official Google Maps logo asset where space allows, which the policy prefers. The current text attribution fits the compact results header.
@@ -74,4 +82,7 @@ Field-mask subpaths such as `currentOpeningHours.openNow` are not documented, so
 - Place Photos (New): https://developers.google.com/maps/documentation/places/web-service/place-photos
 - Place types: https://developers.google.com/maps/documentation/places/web-service/place-types
 - Policies and attributions: https://developers.google.com/maps/documentation/places/web-service/policies
+- Maps URLs: https://developers.google.com/maps/documentation/urls/get-started
+- Maps JavaScript API: https://developers.google.com/maps/documentation/javascript
+- React library: https://visgl.github.io/react-google-maps/
 - Usage and billing: https://developers.google.com/maps/documentation/places/web-service/usage-and-billing

@@ -23,10 +23,11 @@ const nearbyBody = await nearby.json();
 if (!nearby.ok) fail(`nearby ${nearby.status} ${JSON.stringify(nearbyBody)}`);
 if (nearbyBody.source !== "google") fail(`expected source "google", got "${nearbyBody.source}" (is PLACES_PROVIDER=google?)`);
 console.log(`Nearby: ${nearbyBody.results.length} cafes (source=${nearbyBody.source}, providers=${nearbyBody.attributions.length})`);
-for (const cafe of nearbyBody.results.slice(0, 5)) {
-  console.log(`  - ${cafe.name ?? "(no name)"} | rating ${cafe.rating ?? "unknown"} (${cafe.ratingCount ?? "?"}) | open ${cafe.openNow ?? "unknown"} | ${cafe.distanceMeters ?? "?"} m`);
+for (const { cafe, matchPercent, confidence } of nearbyBody.results.slice(0, 5)) {
+  console.log(`  - ${matchPercent ?? "—"}% (${confidence}) ${cafe.name ?? "(no name)"} | rating ${cafe.rating ?? "unknown"} (${cafe.ratingCount ?? "?"}) | open ${cafe.openNow ?? "unknown"} | ${cafe.distanceMeters ?? "?"} m`);
 }
-const first = nearbyBody.results[0];
+// Results are ranked recommendations: { cafe, score, matchPercent, ... } (M3).
+const first = nearbyBody.results[0]?.cafe;
 if (!first) fail("no cafes returned near the city centre");
 
 const details = await fetch(`${baseUrl}/api/places/${encodeURIComponent(first.placeId)}`);
@@ -34,6 +35,7 @@ const detailsBody = await details.json();
 if (!details.ok) fail(`details ${details.status} ${JSON.stringify(detailsBody)}`);
 const place = detailsBody.place;
 console.log(`Details: ${place.name} | hours ${place.weekdayDescriptions ? "yes" : "unknown"} | photos ${place.photos.length} | website ${place.websiteUri ? "yes" : "no"}`);
+console.log(`  reviews ${place.reviews.length} (with author: ${place.reviews.filter((r) => r.authorName).length}) | amenities ${JSON.stringify(place.amenities)}`);
 
 const photo = place.photos[0];
 if (photo) {

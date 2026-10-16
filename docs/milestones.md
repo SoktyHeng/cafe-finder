@@ -6,11 +6,72 @@
 | M1 — Discovery UI and location | ✅ Complete (2026-10-16) |
 | M2 — Google Places live provider | ✅ Complete, including live verification (2026-10-16) |
 | M3 — Ranking and filters | ✅ Complete (2026-10-16) |
-| M4 — Maps and cafe details | Not started |
+| M4 — Maps and cafe details | ✅ Complete (2026-10-16). Live map rendering awaits a browser key |
 | M5 — Auth and favorites | Not started |
 | M6 — Original community amenities | Not started |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M4 — Maps and cafe details
+
+### Delivered
+
+- **Map** (`@vis.gl/react-google-maps` 1.10.1, the Google-sponsored React library for the Maps JavaScript API):
+  - Numbered, keyboard-accessible Advanced Markers, a search-centre pin, fit to results once.
+  - Two-way sync with the list. A marker click highlights, scrolls to and focuses its card. "Show on map" on a card pans to its marker.
+  - Wide screens (1280 px and up) show list and map side by side. Smaller screens are list-first with a List/Map toggle.
+  - The Maps JavaScript API loads only when the map is first shown, then stays mounted, so there are no repeat map loads.
+  - A fallback appears with no key, a load failure or an auth failure. The list keeps working in every case.
+- **`/cafes/[placeId]` details page:**
+  - Rating, straight-line distance from the originating search, open status and price level.
+  - Directions, "Open in Google Maps", website and phone links.
+  - Photos with author credits. The first loads automatically, the rest only on request, because each one is billable.
+  - Hours with today highlighted in the cafe's timezone, matched by weekday name.
+  - Google-reported amenities shown as yes / no / not listed, with an explicit "Wi-Fi and noise level aren't provided by Google" note.
+  - Up to 5 Google reviews with author name, photo and link, and a "Translated by Google" notice.
+  - "Back to results" link, re-serialized from a validated search, never echoed.
+  - Loading skeleton, not-found, and error with retry.
+- **Directions** use official Maps URLs (`destination` + `destination_place_id`, no origin). There's no key and no cost. Demo cafes get no directions, because their coordinates are fictional.
+- **Details data:** the field mask adds `reviews`, `accessibilityOptions`, `paymentOptions` and the amenity booleans, billed as Place Details Enterprise + Atmosphere, per opened page only. Search stays at Enterprise, enforced by a test. Reviews and amenities are normalized explicitly: unsafe links dropped, author required, at most 5, Wi-Fi never invented.
+- **Security:**
+  - A separate public browser key (referrer and Maps JavaScript API restricted) and an optional Map ID.
+  - The server refuses to start if the browser key equals a server key.
+  - Photos use plain `<img>`, so Google images are never fetched or cached by our server.
+- **Shared plumbing:** `requestApi` (typed API calls that never throw) and `useKeyedRequest` (one call per action, deduplicated under Strict Mode), used by both search and details.
+
+### Acceptance verification (2026-10-16)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| List remains usable if Maps fails | ✅ | Component tests for no key, `AUTH_FAILURE` and `FAILED`. E2E on desktop (fallback beside the list, axe clean) and mobile (toggle to the fallback and back). E2E confirms no `maps.googleapis.com` request is made without a key |
+| Attribution correct | ✅ | "Google Maps" text attribution on lists and details. Photo credits on every displayed photo. Review author name, photo and link. "View on / See all reviews on Google Maps" links. Google's own map attribution left untouched |
+| Detail load does not fetch unnecessarily | ✅ | One details call per page view, deduplicated under Strict Mode, with no server-side metadata fetch. Invalid IDs make no call. Only the first photo loads; E2E counts exactly 1 photo request until "Show more" |
+| No unofficial tile service used with Google content | ✅ | Google content only ever appears on Google's own map (Maps JavaScript API). There is no other map library or basemap |
+| Live details with real data | ✅ | `pnpm smoke:live`: details billed as "Place Details Enterprise + Atmosphere", 5 reviews (all with authors), 19 amenity answers. The real `/cafes/…` page rendered in headless Chromium with attribution, 1 credited photo (800×1067 loaded through the proxy), 5 reviews, today's hours ("Friday", correct for Phnom Penh), 9 confirmed amenities, an encoded directions link, and no horizontal overflow at 390 px |
+| Live map rendering | ⏳ **Pending a browser key** | Not run: no `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` is configured. Marker/card sync, lazy loading, failure states and framing are verified with the map library mocked. Manual steps are in [deployment.md](deployment.md#verifying-a-live-configuration) |
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 32 files, 386 tests passed |
+| `pnpm build` | Pass (`/cafes/[placeId]` partially prerendered) |
+| `pnpm test:e2e` | 73 passed, 3 skipped (viewport-specific tests on the other project) |
+| `pnpm check:secrets` | Pass (334 build files) |
+
+### Decisions and deviations
+
+- **Reviews were requested, which puts details at the Atmosphere tier.** Amenities were added at no extra cost, as genuine Google evidence. They are shown on details pages only, and don't feed ranking, because search stays at Enterprise.
+- **Wi-Fi and quietness are still unverifiable.** Google has no such fields. That stays a job for M6 community reports.
+- **Cards** now offer Details, Directions and Show on map. "Open in Google Maps" moved to the details page, alongside the per-review Google Maps links.
+- **The details page doesn't fetch on the server**, to avoid a second billable call for page metadata, so its title stays generic.
+- `DEMO_MAP_ID` is used when no Map ID is configured. Create a real Map ID for production.
+- `scripts/live-smoke.mjs` was outdated after M3 (it read the old flat result shape). It's fixed and now also reports reviews and amenities.
+
+### Remaining risks and follow-ups
+
+- Verify the live map with a real browser key, then add a Content-Security-Policy for Maps origins (M8).
+- Upgrade the "Google Maps" text attribution to the official logo where space allows (M8).
+- Each details view costs one Atmosphere-tier call. Watch `placeDetails` volume in the `places_api_call` logs.
 
 ## M3 — Ranking and filters
 

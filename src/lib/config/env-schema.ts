@@ -113,7 +113,14 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
+  /** Public by design; must be restricted by HTTP referrer and to the Maps JavaScript API. */
   NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: optionalSecret,
+  /** Map ID (not a secret) required for Advanced Markers. */
+  NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/, "must be a Google Maps Map ID")
+    .optional(),
   NEXT_PUBLIC_SUPABASE_URL: z
     .string()
     .trim()
@@ -164,4 +171,25 @@ export function parseServerEnv(source: EnvSource): ServerEnv {
 
 export function parsePublicEnv(source: EnvSource): PublicEnv {
   return parseWith(publicEnvSchema, source);
+}
+
+/**
+ * The browser key ships to every visitor. Reusing the unrestricted server key
+ * there would expose Places Web Service access, so identical keys are refused.
+ */
+export function assertSeparateGoogleKeys(
+  server: Pick<ServerEnv, "GOOGLE_PLACES_SERVER_API_KEY" | "GOOGLE_ROUTES_SERVER_API_KEY">,
+  publicEnv: Pick<PublicEnv, "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY">,
+): void {
+  const browserKey = publicEnv.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY;
+  if (
+    browserKey !== undefined &&
+    (browserKey === server.GOOGLE_PLACES_SERVER_API_KEY ||
+      browserKey === server.GOOGLE_ROUTES_SERVER_API_KEY)
+  ) {
+    throw new EnvValidationError(
+      ["NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY"],
+      ["  - NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: must be a separate, referrer-restricted key (it equals a server key)"],
+    );
+  }
 }

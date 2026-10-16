@@ -86,16 +86,21 @@ test("Google results show attribution, sources and Maps links", async ({ page })
   await expect(first).not.toContainText("Demo data");
   await expect(first.getByTestId("match-badge")).toHaveText("80% matchHigh confidence");
   await expect(first.getByText("Best match")).toBeVisible();
-  await expect(first.getByRole("link", { name: /open in google maps/i })).toHaveAttribute(
+  await expect(first.getByRole("link", { name: /directions/i })).toHaveAttribute(
     "href",
-    "https://maps.google.com/?cid=1234567890",
+    "https://www.google.com/maps/dir/?api=1&destination=Sample+Google-sourced+Cafe&destination_place_id=ChIJtestPlace0001",
+  );
+  await expect(first.getByRole("link", { name: /details/i })).toHaveAttribute(
+    "href",
+    /^\/cafes\/ChIJtestPlace0001\?from=/,
   );
 
   const sparse = page.getByRole("article", { name: "Second Mocked Cafe" });
   await expect(sparse).toContainText("No rating yet");
   await expect(sparse).toContainText("Opening hours unknown");
   await expect(sparse.getByTestId("match-badge")).toHaveText("Limited data");
-  await expect(sparse.getByRole("link")).toHaveCount(0);
+  // Google-sourced, so directions are offered (by name) even with sparse data.
+  await expect(sparse.getByRole("link", { name: /directions/i })).toBeVisible();
 });
 
 test("Google results page has no detectable WCAG A/AA violations", async ({ page }) => {

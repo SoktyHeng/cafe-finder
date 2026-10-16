@@ -7,20 +7,26 @@ import { GoogleMapsAttribution } from "@/components/google-maps-attribution";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CafeCard } from "@/features/cafes/components/cafe-card";
 import { formatRadius } from "@/features/cafes/format";
 import type { DiscoveryRequest } from "@/lib/discovery/request-schema";
 import type { NearbySearchResponse } from "@/lib/discovery/response-schema";
+import type { Coordinates } from "@/lib/geo/distance";
 import type { ExcludedCounts } from "@/lib/places/schemas";
 import { suggestRelaxations, type RelaxationChange } from "@/lib/recommendation/relaxation";
 
 import type { SearchErrorCode } from "../api-client";
 import type { NearbySearchState } from "../hooks/use-nearby-search";
+import { ResultsWithMap, type MapConfig } from "./results-with-map";
 
 type ResultsPanelProps = {
   state: NearbySearchState;
   request: DiscoveryRequest | null;
   locationLabel: string | null;
+  /** Search centre, for the map. */
+  origin: Coordinates | null;
+  /** Current /discover query string, so details pages can link back to these results. */
+  backQuery: string;
+  mapConfig: MapConfig;
   maxRadiusMeters: number;
   onRetry: () => void;
   onEditSearch: () => void;
@@ -55,6 +61,14 @@ const ERROR_COPY: Record<SearchErrorCode, { title: string; body: string; retry: 
   INTERNAL_ERROR: { title: "Something went wrong", body: "Please try again.", retry: true },
   INVALID_RESPONSE: { title: "Something went wrong", body: "Please try again.", retry: true },
 };
+
+/** Details link that remembers which results it came from. */
+export function cafeDetailsHref(placeId: string, backQuery: string): string {
+  const params = new URLSearchParams();
+  if (backQuery) params.set("from", backQuery);
+  const query = params.toString();
+  return `/cafes/${encodeURIComponent(placeId)}${query ? `?${query}` : ""}`;
+}
 
 function pluralize(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -96,6 +110,9 @@ export function ResultsPanel({
   state,
   request,
   locationLabel,
+  origin,
+  backQuery,
+  mapConfig,
   maxRadiusMeters,
   onRetry,
   onEditSearch,
@@ -146,6 +163,9 @@ export function ResultsPanel({
           data={state.outcome.data}
           request={request}
           locationLabel={locationLabel ?? "the selected location"}
+          origin={origin}
+          backQuery={backQuery}
+          mapConfig={mapConfig}
           maxRadiusMeters={maxRadiusMeters}
           onEditSearch={onEditSearch}
           onRelax={onRelax}
@@ -239,6 +259,9 @@ function Results({
   data,
   request,
   locationLabel,
+  origin,
+  backQuery,
+  mapConfig,
   maxRadiusMeters,
   onEditSearch,
   onRelax,
@@ -247,6 +270,9 @@ function Results({
   data: NearbySearchResponse;
   request: DiscoveryRequest;
   locationLabel: string;
+  origin: Coordinates | null;
+  backQuery: string;
+  mapConfig: MapConfig;
   maxRadiusMeters: number;
   onEditSearch: () => void;
   onRelax: (change: RelaxationChange) => void;
@@ -302,13 +328,18 @@ function Results({
           </>
         )}
       </div>
-      <ol className="flex flex-col gap-3" aria-label="Cafes, best match first">
-        {data.results.map((recommendation, index) => (
-          <li key={recommendation.cafe.placeId}>
-            <CafeCard recommendation={recommendation} rank={index + 1} />
-          </li>
-        ))}
-      </ol>
+      <ResultsWithMap
+        // A new search remounts the view: selection and map framing reset.
+        key={`${backQuery}|${data.searchedAt}`}
+        recommendations={data.results}
+        origin={{
+          latitude: origin?.latitude ?? request.latitude,
+          longitude: origin?.longitude ?? request.longitude,
+          label: locationLabel,
+        }}
+        mapConfig={mapConfig}
+        detailsHref={(placeId) => cafeDetailsHref(placeId, backQuery)}
+      />
     </>
   );
 }

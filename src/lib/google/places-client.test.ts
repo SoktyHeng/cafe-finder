@@ -51,14 +51,18 @@ describe("field masks", () => {
     expect(PLACE_DETAILS_FIELD_MASK).toBe(
       "id,displayName,location,formattedAddress,businessStatus,googleMapsUri,attributions," +
         "photos,utcOffsetMinutes,rating,userRatingCount,priceLevel,currentOpeningHours," +
-        "websiteUri,nationalPhoneNumber",
+        "websiteUri,nationalPhoneNumber,accessibilityOptions,reviews,dineIn,takeout,delivery," +
+        "outdoorSeating,goodForGroups,goodForChildren,reservable,restroom,servesBreakfast," +
+        "servesCoffee,servesDessert,servesVegetarianFood,allowsDogs,liveMusic,paymentOptions",
     );
     for (const mask of [NEARBY_SEARCH_FIELD_MASK, PLACE_DETAILS_FIELD_MASK]) {
       expect(mask).not.toContain("*");
       expect(mask).not.toMatch(/\s/);
-      // Atmosphere-tier fields would raise the SKU; keep them out.
-      expect(mask).not.toMatch(/reviews|servesCoffee|editorialSummary|generativeSummary/);
+      // AI summaries are a separate product decision; never requested.
+      expect(mask).not.toMatch(/editorialSummary|generativeSummary|reviewSummary/);
     }
+    // Every search must stay at Enterprise: no Atmosphere fields in Nearby Search.
+    expect(NEARBY_SEARCH_FIELD_MASK).not.toMatch(/reviews|servesCoffee|dineIn|outdoorSeating|goodForGroups/);
   });
 });
 

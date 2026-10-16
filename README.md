@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M3 (ranking and filters) complete.** Cafes are ranked by a configurable, explainable score covering rating, distance, opening status, budget fit and unverified preferences. Live data uses Places API (New) when `PLACES_PROVIDER=google` and a server key are set. Without keys the app runs on clearly labelled **fictional fixture cafes**. See [docs/milestones.md](docs/milestones.md) and [docs/recommendation-scoring.md](docs/recommendation-scoring.md).
+> **Status: M4 (maps and cafe details) complete. The live map needs your browser key** (see [docs/deployment.md](docs/deployment.md)). Cafes are ranked by an explainable score and shown on a Google Map in sync with the list. Details pages show photos, hours, Google reviews and amenities, with directions through Google Maps. Without keys the app runs on clearly labelled **fictional fixture cafes**, and without a browser key the map shows a fallback. See [docs/milestones.md](docs/milestones.md).
 
 ## Stack
 
@@ -28,6 +28,9 @@ Try it: open `/`, pick an area (for example "BKK1") or use your location, then p
 # .env.local
 PLACES_PROVIDER=google
 GOOGLE_PLACES_SERVER_API_KEY=<server key restricted to "Places API (New)">
+# Optional, for the map: a SEPARATE key restricted by HTTP referrer + "Maps JavaScript API"
+NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=<browser key>
+NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=<map id; optional in development>
 ```
 
 Rebuild or restart after changing the provider. Before going live, read [docs/deployment.md](docs/deployment.md) (key restrictions, quotas, budget alerts, `TRUST_PROXY`) and [docs/google-maps-compliance.md](docs/google-maps-compliance.md) (field masks and SKUs, no caching, attribution). `pnpm smoke:live` verifies a running live server and makes about 3 billable calls.
@@ -92,9 +95,9 @@ Folders for later milestones (`lib/supabase/`, `supabase/` and others) are creat
 
 - Live mode needs your own Google key. CI and E2E use fixtures and mocked responses only.
 - Rate limits are in memory, per server instance. Google Cloud quotas are the hard ceiling.
-- Place details and photos are available through the API, but the details page and photo display arrive in M4.
+- The map needs a browser key. Without one, a "Map not available" panel is shown and everything else works.
+- Details pages cost one Place Details call (Enterprise + Atmosphere) per view, plus one Place Photo call per photo shown. Only the first photo loads automatically.
 - Atmosphere, Wi-Fi and quietness have no data source until community reports (M6). They count as neutral and are shown as "not verified". The scoring weights are initial hypotheses, not yet calibrated.
 - Budget, Wi-Fi, quietness and purpose fit can't be verified yet. They are shown as "not verified" and never filter results.
 - Manual location means choosing one of the approximate Phnom Penh areas. There is no address search or map yet (M4).
-- There is no map, cafe details page or directions yet (M4).
 - Dark mode tokens exist, but nothing applies them yet. Privacy and terms pages are planned before production (M8).

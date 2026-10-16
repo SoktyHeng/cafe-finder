@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { recommend, testCafe } from "@/test/recommendations";
 
@@ -20,7 +20,7 @@ const FULL_GOOGLE_CAFE = testCafe({
 
 describe("CafeCard", () => {
   it("shows known facts with their source", () => {
-    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} rank={2} />);
+    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={2} />);
 
     const card = screen.getByRole("article", { name: "Test Cafe" });
     expect(card).toHaveTextContent("4.7 Google rating from 900 reviews");
@@ -31,7 +31,7 @@ describe("CafeCard", () => {
   });
 
   it("shows a match percentage with confidence and evidence-backed reasons", () => {
-    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} rank={1} />);
+    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={1} />);
 
     const badge = screen.getByTestId("match-badge");
     expect(badge).toHaveTextContent(/^\d{1,3}% match/);
@@ -45,7 +45,7 @@ describe("CafeCard", () => {
   });
 
   it("shows 'Limited data' instead of a percentage when evidence is thin", () => {
-    render(<CafeCard recommendation={recommend(testCafe({ placeId: "p2" }))} rank={1} />);
+    render(<CafeCard recommendation={recommend(testCafe({ placeId: "p2" }))} detailsHref="/cafes/x" rank={1} />);
 
     const badge = screen.getByTestId("match-badge");
     expect(badge).toHaveTextContent("Limited data");
@@ -54,7 +54,7 @@ describe("CafeCard", () => {
   });
 
   it("labels unknown data as unknown instead of inventing values", () => {
-    render(<CafeCard recommendation={recommend(testCafe({ placeId: "p2" }))} rank={3} />);
+    render(<CafeCard recommendation={recommend(testCafe({ placeId: "p2" }))} detailsHref="/cafes/x" rank={3} />);
 
     const card = screen.getByRole("article", { name: "Unnamed cafe" });
     expect(card).toHaveTextContent("No rating yet");
@@ -72,7 +72,7 @@ describe("CafeCard", () => {
           preferWifi: true,
           preferQuiet: true,
         })}
-        rank={1}
+        detailsHref="/cafes/x" rank={1}
       />,
     );
     const list = screen.getByRole("list", { name: "Preferences not verified" });
@@ -84,7 +84,7 @@ describe("CafeCard", () => {
   });
 
   it("explains the score breakdown on request", async () => {
-    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} rank={1} />);
+    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={1} />);
     await userEvent.click(screen.getByText("How this match is calculated"));
 
     const table = screen.getByRole("table", { name: "Score breakdown" });
@@ -99,7 +99,7 @@ describe("CafeCard", () => {
         recommendation={recommend(
           testCafe({ placeId: "p3", name: "Shut", businessStatus: "closed_temporarily", openNow: true, dataSource: "google" }),
         )}
-        rank={1}
+        detailsHref="/cafes/x" rank={1}
       />,
     );
     expect(screen.getByText("Temporarily closed")).toBeInTheDocument();
@@ -108,23 +108,52 @@ describe("CafeCard", () => {
     );
   });
 
-  it("links to the place on Google Maps in a new tab", () => {
-    render(
-      <CafeCard
-        recommendation={recommend(
-          testCafe({ placeId: "p5", name: "Linked", googleMapsUri: "https://maps.google.com/?cid=1", dataSource: "google" }),
-        )}
-        rank={1}
-      />,
+  it("links to details and to Google Maps directions", () => {
+    render(<CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/p1?from=area%3Dbkk1" rank={1} />);
+
+    expect(screen.getByRole("link", { name: /details: test cafe/i })).toHaveAttribute(
+      "href",
+      "/cafes/p1?from=area%3Dbkk1",
     );
-    const link = screen.getByRole("link", { name: /open in google maps: linked/i });
-    expect(link).toHaveAttribute("href", "https://maps.google.com/?cid=1");
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    const directions = screen.getByRole("link", { name: /directions: test cafe/i });
+    expect(directions).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/dir/?api=1&destination=Test+Cafe&destination_place_id=p1",
+    );
+    expect(directions).toHaveAttribute("target", "_blank");
+    expect(directions).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("has no Google Maps link without a URI", () => {
-    render(<CafeCard recommendation={recommend(testCafe({ placeId: "p6" }))} rank={1} />);
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  it("offers no directions for demo cafes", () => {
+    render(<CafeCard recommendation={recommend(testCafe({ placeId: "fixture-1", name: "Demo" }))} detailsHref="/cafes/x" rank={1} />);
+    expect(screen.queryByRole("link", { name: /directions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /details/i })).toBeInTheDocument();
+  });
+
+  it("shows on the map when asked and reflects selection", async () => {
+    const onShowOnMap = vi.fn();
+    const { rerender } = render(
+      <CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={1} onShowOnMap={onShowOnMap} />,
+    );
+    const button = screen.getByRole("button", { name: /show on map: test cafe/i });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(button);
+    expect(onShowOnMap).toHaveBeenCalledOnce();
+
+    rerender(
+      <CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={1} onShowOnMap={onShowOnMap} selected />,
+    );
+    expect(screen.getByRole("button", { name: /show on map/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Selected on map")).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveAttribute("data-selected", "true");
+  });
+
+  it("has no map button without a map position, and a compact variant without explanation", () => {
+    render(
+      <CafeCard recommendation={recommend(FULL_GOOGLE_CAFE)} detailsHref="/cafes/x" rank={1} compact />,
+    );
+    expect(screen.queryByRole("button", { name: /show on map/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("How this match is calculated")).not.toBeInTheDocument();
+    expect(screen.getByRole("article")).not.toHaveAttribute("id");
   });
 });

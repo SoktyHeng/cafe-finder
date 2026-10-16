@@ -6,7 +6,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { getServerEnv } = await import("@/lib/config/server-env");
     const { getPublicEnv } = await import("@/lib/config/public-env");
-    getServerEnv();
-    getPublicEnv();
+    const { assertSeparateGoogleKeys } = await import("@/lib/config/env-schema");
+    assertSeparateGoogleKeys(getServerEnv(), getPublicEnv());
   }
 }

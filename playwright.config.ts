@@ -31,6 +31,9 @@ export default defineConfig({
       PLACE_DETAILS_RATE_LIMIT_PER_MINUTE: "10000",
       PLACE_PHOTOS_RATE_LIMIT_PER_MINUTE: "10000",
       PLACES_GLOBAL_RATE_LIMIT_PER_MINUTE: "10000",
+      // No browser key: the Maps JavaScript API is never loaded in tests, and
+      // the map fallback is exercised. Live maps are verified manually.
+      NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "",
     },
   },
 });

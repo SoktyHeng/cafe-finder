@@ -201,3 +201,98 @@ describe("collectAttributions", () => {
     ]);
   });
 });
+
+describe("normalizePlaceDetails: reviews", () => {
+  // Shape per Places API (New) Review reference (verified 2026-10-16).
+  const review = (overrides: Record<string, unknown> = {}) => ({
+    name: "places/ChIJ_r/reviews/abc",
+    relativePublishTimeDescription: "2 weeks ago",
+    rating: 5,
+    text: { text: "  Great flat white.  ", languageCode: "en" },
+    originalText: { text: "Great flat white.", languageCode: "en" },
+    authorAttribution: {
+      displayName: "Sokha",
+      uri: "https://www.google.com/maps/contrib/123",
+      photoUri: "https://lh3.googleusercontent.com/a/photo",
+    },
+    publishTime: "2026-09-30T08:15:30.123456789Z",
+    googleMapsUri: "https://www.google.com/maps/reviews/data=abc",
+    ...overrides,
+  });
+
+  it("keeps Google's text with full author attribution", () => {
+    const [first] = normalizePlaceDetails(parse({ id: "ChIJ_r", reviews: [review()] })).reviews;
+    expect(first).toEqual({
+      authorName: "Sokha",
+      authorUri: "https://www.google.com/maps/contrib/123",
+      authorPhotoUri: "https://lh3.googleusercontent.com/a/photo",
+      rating: 5,
+      relativePublishTime: "2 weeks ago",
+      publishTime: "2026-09-30T08:15:30.123Z",
+      text: "Great flat white.",
+      translated: false,
+      googleMapsUri: "https://www.google.com/maps/reviews/data=abc",
+    });
+  });
+
+  it("flags translated reviews", () => {
+    const [first] = normalizePlaceDetails(
+      parse({ id: "ChIJ_r", reviews: [review({ originalText: { text: "…", languageCode: "km" } })] }),
+    ).reviews;
+    expect(first?.translated).toBe(true);
+  });
+
+  it("drops reviews without an author, unsafe links and bad ratings", () => {
+    const { reviews } = normalizePlaceDetails(
+      parse({
+        id: "ChIJ_r",
+        reviews: [
+          review({ authorAttribution: { uri: "https://x" } }),
+          "garbage",
+          review({
+            rating: 9,
+            authorAttribution: { displayName: "A", uri: "javascript:alert(1)", photoUri: "https://evil.example/p.png" },
+            googleMapsUri: "https://evil.example/",
+          }),
+        ],
+      }),
+    );
+    expect(reviews).toEqual([{ authorName: "A", relativePublishTime: "2 weeks ago", publishTime: "2026-09-30T08:15:30.123Z", text: "Great flat white.", translated: false }]);
+  });
+
+  it("caps reviews at five", () => {
+    const { reviews } = normalizePlaceDetails(
+      parse({ id: "ChIJ_r", reviews: Array.from({ length: 8 }, () => review()) }),
+    );
+    expect(reviews).toHaveLength(5);
+  });
+});
+
+describe("normalizePlaceDetails: amenities", () => {
+  it("keeps Google's yes/no answers and omits unknowns", () => {
+    const { amenities } = normalizePlaceDetails(
+      parse({
+        id: "ChIJ_a",
+        dineIn: true,
+        outdoorSeating: false,
+        servesCoffee: true,
+        accessibilityOptions: { wheelchairAccessibleEntrance: true },
+        paymentOptions: { acceptsCreditCards: false, acceptsNfc: true },
+      }),
+    );
+    expect(amenities).toEqual({
+      dineIn: true,
+      outdoorSeating: false,
+      servesCoffee: true,
+      wheelchairAccessibleEntrance: true,
+      acceptsCreditCards: false,
+      acceptsNfc: true,
+    });
+    expect("takeout" in amenities).toBe(false);
+  });
+
+  it("never invents Wi-Fi or noise attributes", () => {
+    const { amenities } = normalizePlaceDetails(parse({ id: "ChIJ_a", wifi: true, quiet: true }));
+    expect(amenities).toEqual({});
+  });
+});
