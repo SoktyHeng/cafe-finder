@@ -1,6 +1,7 @@
 import { roundCoordinate } from "@/lib/geo/distance";
 import type { SearchArea } from "@/lib/locations/cities";
 import type { RelaxationChange } from "@/lib/recommendation/relaxation";
+import type { Preferences } from "@/lib/user-data/schemas";
 import {
   RADIUS_METERS,
   type Budget,
@@ -108,4 +109,30 @@ export function applyRelaxation(
     case "widenRadius":
       return { ...values, radiusMeters: change.radiusMeters };
   }
+}
+
+/** Saved account defaults become the starting form (location is always chosen per search). */
+export function preferencesToFormValues(preferences: Preferences): DiscoveryFormValues {
+  return {
+    location: null,
+    purpose: preferences.purpose,
+    radiusMeters: preferences.radiusMeters,
+    minRating: preferences.minRating ?? undefined,
+    openNowOnly: preferences.openNowOnly,
+    budget: preferences.budget,
+    preferQuiet: preferences.preferQuiet,
+    preferWifi: preferences.preferWifi,
+  };
+}
+
+export function formValuesToPreferences(values: DiscoveryFormValues): Preferences {
+  return {
+    purpose: values.purpose,
+    radiusMeters: values.radiusMeters,
+    minRating: values.minRating ?? null,
+    openNowOnly: values.openNowOnly,
+    budget: values.budget,
+    preferQuiet: values.preferQuiet,
+    preferWifi: values.preferWifi,
+  };
 }

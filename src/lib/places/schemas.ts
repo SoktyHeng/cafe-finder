@@ -159,6 +159,20 @@ export const cafeDetailsSchema = cafePlaceSchema.extend({
 
 export type CafeDetails = z.infer<typeof cafeDetailsSchema>;
 
+/** What the favorites list shows for a saved place ID (refetched, never stored). */
+export const placeSummarySchema = cafePlaceSchema.pick({
+  placeId: true,
+  name: true,
+  address: true,
+  latitude: true,
+  longitude: true,
+  googleMapsUri: true,
+  businessStatus: true,
+  dataSource: true,
+});
+
+export type PlaceSummary = z.infer<typeof placeSummarySchema>;
+
 export const placeDetailsResponseSchema = z.strictObject({
   place: cafeDetailsSchema,
   fetchedAt: z.iso.datetime(),

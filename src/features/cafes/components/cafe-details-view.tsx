@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formValuesToSearchParams, searchParamsToFormValues } from "@/features/discovery/url-state";
+import { FavoriteButton, VisitedButton } from "@/features/favorites/components/save-buttons";
 import { haversineMeters } from "@/lib/geo/distance";
 import { directionsUrl } from "@/lib/google/maps-urls";
 import type { ApiFailureCode } from "@/lib/http/request-api";
@@ -227,6 +228,8 @@ function Details({ data, origin }: { data: PlaceDetailsResponse; origin: BackLin
               </a>
             </Button>
           )}
+          <FavoriteButton placeId={place.placeId} placeName={name} className="border" />
+          <VisitedButton placeId={place.placeId} placeName={name} />
           {place.phoneNumber && (
             <Button asChild size="lg" variant="outline" className="min-h-11 px-4">
               <a href={`tel:${place.phoneNumber.replace(/[^\d+]/g, "")}`}>

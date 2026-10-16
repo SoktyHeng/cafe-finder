@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   EnvValidationError,
   assertSeparateGoogleKeys,
+  supabaseConfig,
   PLACEHOLDER_VALUE,
   parsePublicEnv,
   parseServerEnv,
@@ -162,6 +163,7 @@ describe("parsePublicEnv", () => {
       NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: undefined,
       NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: undefined,
       NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
     });
   });
@@ -199,21 +201,48 @@ describe("Map ID", () => {
 });
 
 describe("assertSeparateGoogleKeys", () => {
-  const server = { GOOGLE_PLACES_SERVER_API_KEY: "server-key-abc", GOOGLE_ROUTES_SERVER_API_KEY: undefined };
+  const server = {
+    GOOGLE_PLACES_SERVER_API_KEY: "server-key-abc",
+    GOOGLE_ROUTES_SERVER_API_KEY: undefined,
+    SUPABASE_SERVICE_ROLE_KEY: "service-role-xyz",
+  };
+  const noSupabase = { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined, NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined };
 
   it("allows distinct or missing browser keys", () => {
-    expect(() => assertSeparateGoogleKeys(server, { NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "browser-key-xyz" })).not.toThrow();
-    expect(() => assertSeparateGoogleKeys(server, { NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: undefined })).not.toThrow();
+    expect(() => assertSeparateGoogleKeys(server, { ...noSupabase, NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "browser-key-xyz" })).not.toThrow();
+    expect(() => assertSeparateGoogleKeys(server, { ...noSupabase, NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: undefined })).not.toThrow();
   });
 
   it("refuses a browser key equal to a server key, without printing it", () => {
     let error: unknown;
     try {
-      assertSeparateGoogleKeys(server, { NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "server-key-abc" });
+      assertSeparateGoogleKeys(server, { ...noSupabase, NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "server-key-abc" });
     } catch (caught) {
       error = caught;
     }
     expect(error).toBeInstanceOf(EnvValidationError);
     expect((error as Error).message).not.toContain("server-key-abc");
+  });
+});
+
+describe("supabase config", () => {
+  it("is null until both URL and a browser key are set", () => {
+    expect(supabaseConfig({ NEXT_PUBLIC_SUPABASE_URL: undefined, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "k", NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined })).toBeNull();
+    expect(supabaseConfig({ NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined, NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined })).toBeNull();
+  });
+
+  it("prefers the publishable key and falls back to the legacy anon key", () => {
+    const url = "https://x.supabase.co";
+    expect(supabaseConfig({ NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "pub", NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon" })).toEqual({ url, key: "pub" });
+    expect(supabaseConfig({ NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined, NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon" })).toEqual({ url, key: "anon" });
+  });
+
+  it("refuses the service-role key as a browser key", () => {
+    expect(() =>
+      assertSeparateGoogleKeys(
+        { GOOGLE_PLACES_SERVER_API_KEY: undefined, GOOGLE_ROUTES_SERVER_API_KEY: undefined, SUPABASE_SERVICE_ROLE_KEY: "service-secret" },
+        { NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: undefined, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "service-secret", NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined },
+      ),
+    ).toThrow(EnvValidationError);
   });
 });

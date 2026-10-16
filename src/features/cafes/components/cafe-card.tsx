@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/features/favorites/components/save-buttons";
 import { directionsUrl } from "@/lib/google/maps-urls";
 import type { Recommendation } from "@/lib/recommendation/schemas";
 import { cn } from "@/lib/utils";
@@ -131,6 +132,7 @@ export function CafeCard({
             </a>
           </Button>
         )}
+        <FavoriteButton placeId={cafe.placeId} placeName={name} />
         {onShowOnMap && (
           <Button
             type="button"

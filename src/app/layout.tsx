@@ -3,6 +3,8 @@ import { Geist, Roboto } from "next/font/google";
 
 import { AppFooter } from "@/components/app-footer";
 import { AppHeader } from "@/components/app-header";
+import { AuthProvider } from "@/features/auth/auth-provider";
+import { SavedPlacesProvider } from "@/features/favorites/saved-places-provider";
 import { getServerEnv } from "@/lib/config/server-env";
 
 import "./globals.css";
@@ -46,11 +48,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to main content
         </a>
-        <AppHeader />
-        <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">
-          {children}
-        </main>
-        <AppFooter placesProvider={PLACES_PROVIDER} />
+        <AuthProvider>
+          <SavedPlacesProvider>
+            <AppHeader />
+            <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">
+              {children}
+            </main>
+            <AppFooter placesProvider={PLACES_PROVIDER} />
+          </SavedPlacesProvider>
+        </AuthProvider>
       </body>
     </html>
   );

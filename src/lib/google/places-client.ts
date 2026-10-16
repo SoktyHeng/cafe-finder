@@ -7,6 +7,7 @@ import {
   FIELD_MASK_SKU,
   NEARBY_SEARCH_FIELD_MASK,
   PLACE_DETAILS_FIELD_MASK,
+  PLACE_SUMMARY_FIELD_MASK,
 } from "./field-masks";
 import { googleErrorBodySchema } from "./response-schemas";
 
@@ -77,12 +78,13 @@ export class GooglePlacesClient {
     });
   }
 
-  getPlace(placeId: string): Promise<unknown> {
+  getPlace(placeId: string, detail: "full" | "summary" = "full"): Promise<unknown> {
     const url = new URL(`${PLACES_API_BASE_URL}/places/${encodeURIComponent(placeId)}`);
     url.searchParams.set("languageCode", RESPONSE_LANGUAGE);
-    return this.request("placeDetails", url.toString(), {
+    const summary = detail === "summary";
+    return this.request(summary ? "placeSummary" : "placeDetails", url.toString(), {
       method: "GET",
-      headers: { "X-Goog-FieldMask": PLACE_DETAILS_FIELD_MASK },
+      headers: { "X-Goog-FieldMask": summary ? PLACE_SUMMARY_FIELD_MASK : PLACE_DETAILS_FIELD_MASK },
     });
   }
 

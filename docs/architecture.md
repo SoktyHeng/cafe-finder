@@ -1,6 +1,6 @@
 # Architecture
 
-The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M4).
+The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M5).
 
 ```text
 Browser
@@ -11,6 +11,7 @@ Browser
                    │     └─ POST /api/places/nearby
                    └─ ResultsPanel → ResultsWithMap ─┬─ CafeCard (Details · Directions · Show on map)
                                                      └─ CafeMap (lazy; Maps JS API, browser key)
+ /login, /favorites, /account  (auth: Supabase via @supabase/ssr; proxy.ts refreshes sessions)
  /cafes/[placeId] CafeDetailsView (client, inside Suspense)
                    └─ usePlaceDetails → GET /api/places/[placeId] → photos (/api/places/photo), hours, amenities, reviews
 Server
@@ -52,6 +53,11 @@ Server
 | `features/cafes/` | Cafe card, match explanation, map (`cafe-map.tsx`, `map-unavailable.tsx`), details page (`cafe-details-view.tsx`, `photo-gallery.tsx`, `reviews-list.tsx`, `amenities-list.tsx`, `opening-hours-list.tsx`), formatting |
 | `features/discovery/components/results-with-map.tsx` | List and map layout, List/Map toggle, two-way selection |
 | `lib/google/maps-urls.ts` | Official, key-free Google Maps directions links |
+| `lib/supabase/` | `server.ts` (request-scoped client, `getVerifiedUser` via `getClaims`), `browser.ts` (UI state only), `proxy.ts` (session refresh plus optimistic redirects), hand-written `database.types.ts` |
+| `proxy.ts` | Next.js 16 Proxy (formerly middleware): runs `updateSession` on every non-static request |
+| `lib/user-data/` | Zod contracts, the `UserDataStore` interface, the RLS-scoped Supabase store, route handlers (CSRF, auth, rate limit), and favorites summaries (Place Details Pro) |
+| `features/auth/` | Server actions (sign-in, sign-up, Google), `AuthProvider` (UI state), login and account views |
+| `features/favorites/` | `SavedPlacesProvider` (optimistic favorite and visited toggles), Save and Visited buttons, favorites view |
 | `lib/http/request-api.ts`, `hooks/use-keyed-request.ts` | Typed API calls that never throw, and deduplicated one-call-per-action requests (shared by search and details) |
 
 ## Key decisions
@@ -63,11 +69,15 @@ Server
 - **Error boundaries.** `app/error.tsx` and `app/global-error.tsx` (M0) handle render errors. Search failures are handled in the UI as states.
 - **Rendering.** `/` and `/discover` are prerendered shells. `/discover` and `/cafes/[placeId]` read URL state on the client inside `<Suspense>`, as Cache Components require. The details page doesn't fetch on the server, so there's no second billable details call for metadata.
 - **Map lifecycle.** The Maps JavaScript API loads only when a map is first shown: always on wide screens, after "Map" is chosen on narrow ones. The map is then kept mounted. Selection changes only pan the map and restyle markers. A new search remounts the view, which resets selection and framing. Without a key, or on a load or auth failure, the map is replaced by a fallback and the list keeps working.
+- **Auth boundary.** The browser reads only sign-in *state*, for buttons. Every protected page and API route verifies the JWT on the server (`getClaims`) and queries Supabase *as the user*, so RLS is the final gate. The proxy redirects signed-out visitors from `/favorites` and `/account` as an optimistic check; the pages check again.
+- **Guest-first.** Search, map and details never need an account. Without Supabase configured, all sign-in UI is hidden.
+- **Saved data stores IDs only.** Favorites and visits store Google place IDs and user-authored notes. Names and addresses are refetched per view with a Pro-tier summary mask: at most 50 per page, 5 at a time, 10 page loads per user per minute.
 - **Key separation.** The public browser key (Maps JavaScript API) and the server key (Places) are distinct. `instrumentation.ts` refuses to start if they're equal.
 
 ## Deviations from CLAUDE.md
 
 - The DTO fields `googleRating` and `googleRatingCount` are named `rating` and `ratingCount`, because fixture data is not Google data. The source comes from `dataSource` and is always shown next to the rating.
 - `features/discovery/` also contains `hooks/` and non-component modules (`form-state.ts`, `url-state.ts`, `api-client.ts`).
+- The Supabase browser key is read from `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase's current name). CLAUDE.md's `NEXT_PUBLIC_SUPABASE_ANON_KEY` is accepted as a fallback.
 - Shared modules `lib/discovery/`, `lib/geo/` and `lib/locations/` were added. They don't fit the existing boundaries and need no vendor access.
 - The route handler logic lives in `handler.ts` next to `route.ts`, so it can be tested with injected dependencies. Next.js route files may only export HTTP methods and config.

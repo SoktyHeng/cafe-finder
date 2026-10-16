@@ -6,11 +6,81 @@
 | M1 — Discovery UI and location | ✅ Complete (2026-10-16) |
 | M2 — Google Places live provider | ✅ Complete, including live verification (2026-10-16) |
 | M3 — Ranking and filters | ✅ Complete (2026-10-16) |
-| M4 — Maps and cafe details | ✅ Complete (2026-10-16). Live map rendering awaits a browser key |
-| M5 — Auth and favorites | Not started |
+| M4 — Maps and cafe details | ✅ Complete, including live map verification (2026-10-16) |
+| M5 — Auth and favorites | ✅ Implemented and verified offline (2026-10-16). Live sign-in awaits a Supabase project |
 | M6 — Original community amenities | Not started |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M5 — Auth and favorites
+
+### Delivered
+
+- **Database** ([supabase/migrations/20261016000000_m5_profiles_favorites.sql](../supabase/migrations/20261016000000_m5_profiles_favorites.sql), documented in [data-model.md](data-model.md)):
+  - Tables: `profiles`, `user_preferences`, `favorite_places` (place ID plus private notes) and `visit_feedback`.
+  - Constraints mirror the API.
+  - Triggers: new-user profile/preferences creation, `updated_at`, and a 500-row cap per user.
+  - RLS covers SELECT, INSERT, UPDATE and DELETE on every user-owned table. The default ALL grants, including RLS-bypassing TRUNCATE, are revoked, and `anon` gets nothing.
+  - `delete_own_account()` deletes the caller's data in one step, so no service-role key is needed.
+  - Rollback and backfill notes are included.
+- **Auth** (`@supabase/ssr` 0.12.7, `@supabase/supabase-js` 2.117.2):
+  - Email/password sign-in and sign-up as server actions: generic errors, no account enumeration, 8–72 character passwords, a per-client attempt limit.
+  - Google OAuth with PKCE, through `/auth/callback`.
+  - Email confirmation through `/auth/confirm` (`token_hash`).
+  - Redirects are built from the configured app URL. `next` must be a same-site path.
+- **Sessions:**
+  - The Next.js 16 `proxy.ts` refreshes sessions on every request, forwarding the library's no-store headers.
+  - It redirects signed-out visitors away from `/favorites` and `/account`.
+  - Pages and APIs re-verify with `getClaims()` and never trust `getSession()`.
+- **API:** `/api/favorites`, `/api/visits`, `/api/preferences`, `/api/profile` and `/api/account`.
+  - Same-origin checks for mutations (CSRF), strict JSON schemas, a per-user rate limit, and safe error mapping.
+  - Queries run **as the user**, so RLS is the final gate.
+- **UI:**
+  - Header links that change with sign-in state.
+  - "Save" on cards and details, and "Mark as visited" on details, with optimistic updates and rollback.
+  - Guests see "Sign in to save", which returns them to the same page after sign-in.
+  - `/favorites`: notes, remove, visited list, and names refetched per view with a Pro-tier summary mask.
+  - `/account`: profile, saved search defaults (reusing the search controls), sign-out, and account deletion confirmed by typing a phrase.
+  - The home form starts from saved defaults.
+- **Guest-only mode:** without Supabase, all sign-in UI is hidden and the account pages explain why. Search, map and details are unaffected.
+
+### Acceptance verification (2026-10-16)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Guest search still functions | ✅ | All earlier E2E tests pass unchanged. `guest-mode.spec.ts` covers search and details with no sign-in UI. Component tests cover signed-out users seeing "Sign in to save" with no API calls |
+| One user cannot read or change another's saved data | ✅ | **RLS:** the migration in real Postgres (PGlite 18.3) with Supabase's generous default grants stubbed. Cross-user SELECT, UPDATE and DELETE affect 0 rows; INSERT for another user and reassigning `user_id` are rejected; anonymous access and TRUNCATE are denied. **API:** the store never takes a user ID from the client, strict schemas reject `user_id`, there's 401 without a session and 403 cross-site |
+| Persistent favorites across devices | ⏳ **Live check pending** | Favorites live in Postgres keyed by the auth user, and the logic is fully tested offline. Verifying on two browsers needs a Supabase project. Steps are in [deployment.md](deployment.md#supabase-setup-m5) |
+| Google details refetched properly | ✅ | Only place IDs are stored. `/favorites` refetches summaries per view (Pro mask, 50 at most, 5 at a time, 10 page loads per user per minute) and degrades to "details unavailable" without failing |
+| Data deletion | ✅ | `delete_own_account()` cascade test: the caller's rows in all 4 tables are removed and nobody else's. The API requires the typed confirmation phrase and rejects cross-site requests |
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 40 files, 503 tests passed, including 20 RLS tests on real Postgres |
+| `pnpm build` | Pass (Proxy active) |
+| `pnpm test:e2e` | 89 passed, 3 skipped (viewport-specific) |
+| `pnpm check:secrets` | Pass (540 build files; the service-role canary is not present) |
+
+### Bugs found and fixed while building
+
+- **Postgres regex limit.** `{1,512}` in the place-ID check fails on Postgres, whose repetition counts are capped at 255. It would have broken every favorite on Supabase. It's now a character class plus `char_length`.
+- **TRUNCATE bypasses RLS.** Supabase's default grants include it. The migration now revokes all privileges and grants back only the operations it needs.
+- **Prerender blocked by `usePathname()` in the auth provider.** That hook is now isolated in its own Suspense boundary.
+
+### Decisions and deviations
+
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase's current name) is the primary variable. `NEXT_PUBLIC_SUPABASE_ANON_KEY` from CLAUDE.md is accepted as a fallback. The server refuses to start if the service-role key is configured as a browser key.
+- Visits are one record per place in M5. `liked` and `comment` are reserved for the M6 feedback work.
+- The database types are hand-written to match the migration. Regenerate them with `supabase gen types` once a project is linked.
+- There's no password-reset flow yet. Supabase's dashboard can send reset links. Add a `/account/update-password` flow in M8.
+- E2E runs in guest-only mode. Signed-in behaviour is covered by unit, component and RLS tests, plus the manual live checklist.
+
+### Remaining risks and follow-ups
+
+- Live verification with a Supabase project: sign-up, email confirmation, Google OAuth, cross-device favorites, account deletion.
+- Privacy and terms pages describing accounts and data deletion are needed before launch (M8).
+- The auth-attempt and user-data rate limits are in memory, per instance (see M2's note).
 
 ## M4 — Maps and cafe details
 
@@ -48,7 +118,7 @@
 | Detail load does not fetch unnecessarily | ✅ | One details call per page view, deduplicated under Strict Mode, with no server-side metadata fetch. Invalid IDs make no call. Only the first photo loads; E2E counts exactly 1 photo request until "Show more" |
 | No unofficial tile service used with Google content | ✅ | Google content only ever appears on Google's own map (Maps JavaScript API). There is no other map library or basemap |
 | Live details with real data | ✅ | `pnpm smoke:live`: details billed as "Place Details Enterprise + Atmosphere", 5 reviews (all with authors), 19 amenity answers. The real `/cafes/…` page rendered in headless Chromium with attribution, 1 credited photo (800×1067 loaded through the proxy), 5 reviews, today's hours ("Friday", correct for Phnom Penh), 9 confirmed amenities, an encoded directions link, and no horizontal overflow at 390 px |
-| Live map rendering | ⏳ **Pending a browser key** | Not run: no `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` is configured. Marker/card sync, lazy loading, failure states and framing are verified with the map library mocked. Manual steps are in [deployment.md](deployment.md#verifying-a-live-configuration) |
+| Live map rendering | ✅ | Verified with your referrer-restricted browser key in headless Chromium at 1440 px. 20 numbered markers plus the search-centre pin. Clicking marker 3 highlighted, scrolled to and focused the matching card, and the selected pin rendered dark and enlarged. Google's attribution is present (logo link, "Map data ©2026", Terms, Keyboard shortcuts). No console errors |
 
 | Command | Result |
 |---|---|

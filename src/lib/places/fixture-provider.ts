@@ -9,7 +9,8 @@ import {
   type PlaceDetailsResult,
   type PlacesProvider,
 } from "./provider";
-import type { CafePlace } from "./schemas";
+import type { CafePlace, PlaceSummary } from "./schemas";
+import { toPlaceSummary } from "./summary";
 
 /**
  * Deterministic offline provider backed by fictional demo cafes. It mimics a
@@ -45,6 +46,11 @@ export class FixturePlacesProvider implements PlacesProvider {
     return cafe
       ? { place: { ...cafe, photos: [], reviews: [], amenities: {} }, attributions: [] }
       : null;
+  }
+
+  async getPlaceSummary(placeId: string): Promise<PlaceSummary | null> {
+    const cafe = this.cafes.find((candidate) => candidate.placeId === placeId);
+    return cafe ? toPlaceSummary(cafe) : null;
   }
 
   async getPhotoUrl(_photoName: string, _maxWidthPx: PhotoWidth): Promise<string | null> {

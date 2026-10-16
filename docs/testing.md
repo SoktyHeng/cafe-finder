@@ -18,6 +18,19 @@
 - E2E runs a **production build** in fixture mode on port 3100 (`reuseExistingServer` outside CI). E2E must never call Google or Supabase. Upstream APIs are mocked from M2 onward.
 - Default CI must never call Google APIs.
 
+## Auth and user data tests (M5)
+
+| Test | Covers |
+|---|---|
+| `src/test/db/rls.test.ts` | The **real migration** in PGlite with Supabase's `auth` stubbed and its generous default grants. Cross-user read, write and delete isolation. Anonymous denial. TRUNCATE revoked. Constraints and the 500-row cap. New-user trigger. `delete_own_account()` cascades for the caller only |
+| `lib/user-data/handlers.test.ts` | 401 without a session, 503 when unconfigured, CSRF (missing or foreign `Origin`, `Sec-Fetch-Site`), strict validation (no client `user_id`), error mapping without leaks, account-deletion confirmation, per-user rate limit |
+| `lib/user-data/supabase-store.test.ts` | Exact tables, columns and conflict targets. Notes kept on re-save. Postgres error-code mapping. Preference row mapping. The delete RPC followed by local sign-out |
+| `lib/supabase/proxy.test.ts` | Pass-through when unconfigured. Protected-path redirect with `next`. Rotated cookies and no-store headers forwarded |
+| `lib/security/safe-redirect.test.ts`, `features/auth/credentials.test.ts` | Open-redirect defence. Password rules. Generic, non-enumerating auth errors |
+| `features/favorites/components/favorites-ui.test.tsx`, `features/auth/components/auth-pages.test.tsx` | Save and Visited buttons per auth state, with optimistic toggle and rollback. Header links. Favorites list and notes. Login modes and errors. Safe `next`. Account defaults, profile, deletion phrase, sign-out. Saved defaults pre-filling the home form |
+| `tests/e2e/guest-mode.spec.ts` | E2E runs without Supabase: guest search, details with no sign-in UI, "accounts aren't available" pages, 503 on user-data reads, 403 on cross-site mutations, safe auth-callback failures, axe |
+| Manual live checklist | [deployment.md → Supabase setup](deployment.md#supabase-setup-m5) |
+
 ## Maps and details tests (M4)
 
 The Maps JavaScript API can't run in jsdom or CI without a key, so it is never loaded in tests.

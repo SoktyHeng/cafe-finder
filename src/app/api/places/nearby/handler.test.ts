@@ -181,6 +181,7 @@ describe("POST /api/places/nearby", () => {
         searchNearby: () => Promise.reject(new Error("upstream said: key=AIzaSECRET")),
         getPlaceDetails: () => Promise.resolve(null),
         getPhotoUrl: () => Promise.resolve(null),
+        getPlaceSummary: () => Promise.resolve(null),
       };
       const response = await makeHandler({ provider: failing })(post(VALID_BODY));
       const error = await errorOf(response);
@@ -243,6 +244,7 @@ describe("POST /api/places/nearby", () => {
       }),
       getPlaceDetails: async () => null,
       getPhotoUrl: async () => null,
+      getPlaceSummary: async () => null,
     };
     const body = nearbySearchResponseSchema.parse(
       await (await makeHandler({ provider })(post(VALID_BODY))).json(),

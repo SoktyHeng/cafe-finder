@@ -34,6 +34,11 @@ export default defineConfig({
       // No browser key: the Maps JavaScript API is never loaded in tests, and
       // the map fallback is exercised. Live maps are verified manually.
       NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "",
+      // Guest-only mode: no Supabase project in CI. Auth is covered by unit,
+      // component and PGlite RLS tests, plus the manual live checklist.
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
     },
   },
 });

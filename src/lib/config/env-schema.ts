@@ -127,6 +127,9 @@ export const publicEnvSchema = z.object({
     .optional()
     .transform((value) => (value === "" ? undefined : value))
     .pipe(z.url().optional()),
+  /** Supabase publishable key (browser-safe; access is enforced by RLS). */
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: optionalSecret,
+  /** Legacy name for the same browser-safe key; used only if the publishable key is unset. */
   NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalSecret,
 });
 
@@ -173,14 +176,41 @@ export function parsePublicEnv(source: EnvSource): PublicEnv {
   return parseWith(publicEnvSchema, source);
 }
 
+export type SupabaseConfig = { url: string; key: string };
+
+/** Supabase connection settings, or `null` when auth is not configured (guest-only mode). */
+export function supabaseConfig(
+  publicEnv: Pick<
+    PublicEnv,
+    "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  >,
+): SupabaseConfig | null {
+  const url = publicEnv.NEXT_PUBLIC_SUPABASE_URL;
+  const key = publicEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return url && key ? { url, key } : null;
+}
+
 /**
  * The browser key ships to every visitor. Reusing the unrestricted server key
  * there would expose Places Web Service access, so identical keys are refused.
  */
 export function assertSeparateGoogleKeys(
-  server: Pick<ServerEnv, "GOOGLE_PLACES_SERVER_API_KEY" | "GOOGLE_ROUTES_SERVER_API_KEY">,
-  publicEnv: Pick<PublicEnv, "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY">,
+  server: Pick<ServerEnv, "GOOGLE_PLACES_SERVER_API_KEY" | "GOOGLE_ROUTES_SERVER_API_KEY" | "SUPABASE_SERVICE_ROLE_KEY">,
+  publicEnv: Pick<
+    PublicEnv,
+    "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  >,
 ): void {
+  const service = server.SUPABASE_SERVICE_ROLE_KEY;
+  // The service-role key bypasses RLS; it must never be configured as a browser key.
+  for (const name of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
+    if (service !== undefined && publicEnv[name] === service) {
+      throw new EnvValidationError(
+        [name],
+        [`  - ${name}: must be the publishable/anon key, not the service-role key`],
+      );
+    }
+  }
   const browserKey = publicEnv.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY;
   if (
     browserKey !== undefined &&

@@ -5,6 +5,7 @@ import type {
   CafePlace,
   DataProviderAttribution,
   DataSource,
+  PlaceSummary,
 } from "./schemas";
 
 /** Nearby Search (New) caps results per request; results are never exhaustive. */
@@ -38,6 +39,8 @@ export interface PlacesProvider {
   searchNearby(params: NearbySearchParams): Promise<NearbySearchResult>;
   /** `null` when the place does not exist (or no longer exists). */
   getPlaceDetails(placeId: string): Promise<PlaceDetailsResult | null>;
+  /** Name/address/location only, for listing saved places cheaply. `null` if gone. */
+  getPlaceSummary(placeId: string): Promise<PlaceSummary | null>;
   /**
    * A short-lived image URL for a photo name previously returned by this
    * provider, or `null` if the photo is unknown or expired.

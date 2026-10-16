@@ -29,7 +29,8 @@ import {
   type PlaceDetailsResult,
   type PlacesProvider,
 } from "./provider";
-import { PHOTO_NAME_PATTERN, PLACE_ID_PATTERN } from "./schemas";
+import { PHOTO_NAME_PATTERN, PLACE_ID_PATTERN, type PlaceSummary } from "./schemas";
+import { toPlaceSummary } from "./summary";
 
 /** Converts vendor failures into the provider-neutral unavailable error. */
 function unavailable(error: unknown): never {
@@ -122,6 +123,30 @@ export class GooglePlacesProvider implements PlacesProvider {
       place: normalizePlaceDetails(place),
       attributions: collectAttributions([place]),
     };
+  }
+
+  async getPlaceSummary(placeId: string): Promise<PlaceSummary | null> {
+    if (!PLACE_ID_PATTERN.test(placeId)) {
+      return null;
+    }
+    let raw: unknown;
+    try {
+      raw = await this.client.getPlace(placeId, "summary");
+    } catch (error) {
+      if (
+        error instanceof GooglePlacesError &&
+        (error.kind === "not_found" || error.kind === "bad_request")
+      ) {
+        return null;
+      }
+      unavailable(error);
+    }
+    const place = parseGooglePlace(raw);
+    if (!place) {
+      logEvent("error", "places_invalid_response", { endpoint: "placeSummary" });
+      throw new PlacesProviderUnavailableError("google:invalid_response");
+    }
+    return toPlaceSummary(normalizeNearbyPlace(place));
   }
 
   async getPhotoUrl(photoName: string, maxWidthPx: PhotoWidth): Promise<string | null> {

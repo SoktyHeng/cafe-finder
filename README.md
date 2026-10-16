@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M4 (maps and cafe details) complete. The live map needs your browser key** (see [docs/deployment.md](docs/deployment.md)). Cafes are ranked by an explainable score and shown on a Google Map in sync with the list. Details pages show photos, hours, Google reviews and amenities, with directions through Google Maps. Without keys the app runs on clearly labelled **fictional fixture cafes**, and without a browser key the map shows a fallback. See [docs/milestones.md](docs/milestones.md).
+> **Status: M5 (auth and favorites) implemented and verified offline. Live sign-in awaits your Supabase project** (see [docs/deployment.md](docs/deployment.md#supabase-setup-m5)). Guests can search, view the map and read details without an account. Signed-in users can save favorites with notes, mark visits and save search defaults, protected by Postgres Row Level Security. Without Supabase the site runs in guest-only mode. See [docs/milestones.md](docs/milestones.md).
 
 ## Stack
 
@@ -31,6 +31,9 @@ GOOGLE_PLACES_SERVER_API_KEY=<server key restricted to "Places API (New)">
 # Optional, for the map: a SEPARATE key restricted by HTTP referrer + "Maps JavaScript API"
 NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=<browser key>
 NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=<map id; optional in development>
+# Optional, for accounts (M5): Supabase project URL + publishable key, then apply supabase/migrations
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 ```
 
 Rebuild or restart after changing the provider. Before going live, read [docs/deployment.md](docs/deployment.md) (key restrictions, quotas, budget alerts, `TRUST_PROXY`) and [docs/google-maps-compliance.md](docs/google-maps-compliance.md) (field masks and SKUs, no caching, attribution). `pnpm smoke:live` verifies a running live server and makes about 3 billable calls.
@@ -86,7 +89,8 @@ src/
   lib/security/        error contract, rate limits, URL allowlists
   lib/geo/ lib/locations/ lib/observability/
 tests/e2e/             Playwright specs (smoke, discovery, accessibility)
-docs/                  architecture, API contracts, testing, milestones
+supabase/migrations/   versioned SQL (tables, RLS, triggers) + rollback notes
+docs/                  architecture, data model, API contracts, testing, milestones
 ```
 
 Folders for later milestones (`lib/supabase/`, `supabase/` and others) are created in the milestone that needs them. See CLAUDE.md §5. API details are in [docs/api-contracts.md](docs/api-contracts.md).

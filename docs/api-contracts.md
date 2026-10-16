@@ -126,3 +126,36 @@ Implementation: [src/app/api/places/photo/handler.ts](../src/app/api/places/phot
 - `name` must match `places/{id}/photos/{ref}`. `maxWidthPx` is 200, 400 (the default) or 800.
 - `302` redirects to a `*.googleusercontent.com` image URL, with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. The key stays on the server, and any other redirect host is refused.
 - `400` for an invalid name or width, `404` for an expired or unknown photo (refetch the details), `429` when rate-limited, `503` for an upstream failure.
+
+## User data (M5)
+
+All routes require a Supabase session, verified on the server with `getClaims()` (never `getSession()`), and run **as the user**, so Postgres RLS applies. Responses are `Cache-Control: private, no-store`.
+
+| Route | Methods | Body / query | Success |
+|---|---|---|---|
+| `/api/favorites` | GET | | `{ favorites: [{ placeId, notes, createdAt }] }`, newest first, at most 500 |
+| | POST | `{ placeId, notes? }` | 201 `{ favorite }`. Upsert: re-saving keeps notes unless given |
+| | PATCH | `{ placeId, notes }` (`""` clears) | `{ favorite }`, or 404 if not a favorite |
+| | DELETE | `?placeId=` | 204 |
+| `/api/visits` | GET / POST `{ placeId }` / DELETE `?placeId=` | | `{ visits: [{ placeId, visitDate, createdAt }] }` / 201 / 204 |
+| `/api/preferences` | GET / PUT | `{ purpose, radiusMeters, minRating (0–5, step 0.1, or null), openNowOnly, budget, preferQuiet, preferWifi }` | `{ preferences }` |
+| `/api/profile` | GET / PATCH | `{ displayName }` (≤80, blank means null) | `{ profile: { displayName, email } }` |
+| `/api/account` | DELETE | `{ confirm: "delete my account" }` | 204. All first-party data deleted |
+
+Protections:
+- **CSRF:** POST, PUT, PATCH and DELETE require an `Origin` header equal to the request's origin, and reject `Sec-Fetch-Site: cross-site` (403 `FORBIDDEN`). Bodies must be JSON, at most 4 KB. Schemas are strict, so a client-supplied `user_id` is rejected.
+- **Rate limit:** 60 requests per minute per user (429 with `Retry-After`).
+
+Errors:
+- `401 AUTH_REQUIRED`: no valid session.
+- `503 UPSTREAM_UNAVAILABLE`: Supabase isn't configured, or is unreachable.
+- `400 VALIDATION_ERROR`: invalid input or the 500-row limit. Field names only, never values.
+- Database errors are logged as `user_data_failed` (operation and error name only) and never returned.
+
+## Auth routes (M5)
+
+| Route | Purpose |
+|---|---|
+| `/login` | Email/password sign-in and sign-up (server actions), and "Continue with Google". `?next=` must be a same-site path; anything else falls back to `/` |
+| `/auth/callback` | OAuth return: exchanges the PKCE `code` for a session, then redirects to `next`. Failure goes to `/login?error=oauth` |
+| `/auth/confirm` | Email links: `verifyOtp({ token_hash, type })`, then redirects to `next`. Failure goes to `/login?error=confirm` |

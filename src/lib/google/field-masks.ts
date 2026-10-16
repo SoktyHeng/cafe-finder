@@ -71,8 +71,22 @@ export const PLACE_DETAILS_FIELD_MASK = [
   "paymentOptions",
 ].join(",");
 
+/**
+ * Minimal details for listing saved cafes (favorites store only place IDs).
+ * Billed as Place Details Pro, far cheaper than the full details mask.
+ */
+export const PLACE_SUMMARY_FIELD_MASK = [
+  "id",
+  "displayName",
+  "shortFormattedAddress",
+  "location",
+  "googleMapsUri",
+  "businessStatus",
+].join(",");
+
 export const FIELD_MASK_SKU = {
   nearbySearch: "Nearby Search Enterprise",
   placeDetails: "Place Details Enterprise + Atmosphere",
+  placeSummary: "Place Details Pro",
   placePhoto: "Place Photo",
 } as const;

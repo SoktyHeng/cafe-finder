@@ -20,6 +20,37 @@ This covers the M2 scope: Google Places configuration. The production checklist 
 5. Set **quotas** under APIs & Services → Places API (New) → Quotas: requests per minute and per day for Nearby Search, Place Details and Place Photo, sized to expected traffic. Also set a daily quota for Maps JavaScript API map loads.
 6. Set a **billing budget with alerts**, for example at 50%, 90% and 100%. Budgets alert but do not cap spending, so the quotas are the hard limit.
 
+## Supabase setup (M5)
+
+1. Create a project at supabase.com (one per environment). In **Project Settings → API**, copy the **Project URL** into `NEXT_PUBLIC_SUPABASE_URL` and the **publishable** key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy projects: the anon key). These are public by design: RLS enforces access. **Never** put the service-role or secret key in a `NEXT_PUBLIC_` variable; the server refuses to start if you do.
+2. Apply the migration: `supabase db push` (see [supabase/migrations/README.md](../supabase/migrations/README.md)), or paste the file into the SQL Editor once.
+3. Under **Authentication → URL Configuration**:
+   - set **Site URL** to the app URL (`http://localhost:3000` locally);
+   - add redirect URLs `http://localhost:3000/auth/callback` and `http://localhost:3000/auth/confirm`, plus the same for each deployed domain.
+4. Under **Authentication → Providers → Email**:
+   - keep **Confirm email** on;
+   - set the minimum password length to **8** (the app enforces 8–72);
+   - enable **leaked password protection** if your plan offers it.
+5. Under **Authentication → Email Templates → Confirm signup**, link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}`. This works in any browser, with no PKCE verifier needed.
+6. **Google sign-in:**
+   - In Google Cloud, go to **APIs & Services → Credentials → Create OAuth client ID** and choose **Web application**.
+   - Set the authorized redirect URI to `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - Paste the client ID and secret into **Supabase → Authentication → Providers → Google**.
+   - This OAuth client is separate from the Maps API keys.
+7. Rebuild after setting the `NEXT_PUBLIC_SUPABASE_*` values (they're inlined at build time).
+
+Without Supabase, the site runs in **guest-only mode**. Search, map and details all work. Sign-in UI is hidden, and `/login`, `/favorites` and `/account` explain that accounts aren't available.
+
+**Manual live check** (after setup):
+1. Create an account at `/login`, confirm it from the email, and you should land back where you started.
+2. Save a cafe from `/discover`. It appears under `/favorites` with its name, and notes save.
+3. Mark a cafe as visited on its details page.
+4. Change your defaults at `/account`. The home form starts from them.
+5. Sign in on a second browser. Your favorites are there too.
+6. Sign out. `/favorites` now redirects to `/login?next=%2Ffavorites`.
+7. "Continue with Google" works.
+8. Delete the account at `/account`. In the Supabase table editor, that user's rows are gone.
+
 ## Application configuration
 
 | Variable | Default | Notes |
