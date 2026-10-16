@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M0 (repository foundation).** The site shell runs, but cafe search is not built yet. No Google or Supabase integration exists so far. See [docs/milestones.md](docs/milestones.md).
+> **Status: M1 (discovery UI and location) complete.** Search works end to end with **fictional fixture cafes**. Google Places is not connected yet (M2). See [docs/milestones.md](docs/milestones.md).
 
 ## Stack
 
@@ -18,7 +18,9 @@ cp .env.example .env.local   # optional; every value has a safe default
 pnpm dev                     # http://localhost:3000
 ```
 
-The app starts in **fixture mode** (`PLACES_PROVIDER=fixture`) with no Google or Supabase keys. Fixture mode only uses fictional demo data, and the footer says so.
+The app starts in **fixture mode** (`PLACES_PROVIDER=fixture`) with no Google or Supabase keys. Fixture mode only uses fictional demo data, and the footer, the results header and each card say so.
+
+Try it: open `/`, pick an area (for example "BKK1") or use your location, then press **Find My Cafe**.
 
 ## Commands
 
@@ -57,19 +59,26 @@ Rules:
 
 ```text
 src/
-  app/            routes, root layout, error/global-error/not-found boundaries
-  components/     app shell (header, footer, error fallback) and shadcn/ui primitives in ui/
-  lib/config/     validated environment
-  lib/utils.ts    cn() class-name helper
-  test/           Vitest setup and stubs
-tests/e2e/        Playwright specs
-docs/             architecture, testing and milestone status
+  app/                 routes: / , /discover, POST /api/places/nearby, error boundaries
+  components/          app shell and shadcn/ui primitives (ui/)
+  features/discovery/  search form, URL state, geolocation, search hook, results states
+  features/cafes/      cafe card and formatting
+  lib/config/          validated environment
+  lib/discovery/       discovery request schema (shared client/server)
+  lib/places/          CafePlace DTO, PlacesProvider, fixture provider + fictional data
+  lib/recommendation/  hard filters and interim ordering
+  lib/geo/ lib/locations/ lib/security/
+tests/e2e/             Playwright specs (smoke, discovery, accessibility)
+docs/                  architecture, API contracts, testing, milestones
 ```
 
-Folders for later milestones (`features/`, `lib/places/`, `lib/google/`, `supabase/` and others) are created in the milestone that needs them. See CLAUDE.md §5.
+Folders for later milestones (`lib/google/`, `lib/supabase/`, `supabase/` and others) are created in the milestone that needs them. See CLAUDE.md §5. API details are in [docs/api-contracts.md](docs/api-contracts.md).
 
 ## Known limitations
 
-- There is no discovery UI, search API, map, or authentication yet (M1 to M5).
-- Dark mode tokens exist, but nothing applies them yet.
-- Privacy and terms pages are planned before production (M8).
+- Only fictional fixture data so far. The live Google Places provider, rate limiting and quotas arrive in M2.
+- Results are ordered by straight-line distance. Explainable ranking arrives in M3.
+- Budget, Wi-Fi, quietness and purpose fit can't be verified yet. They are shown as "not verified" and never filter results.
+- Manual location means choosing one of the approximate Phnom Penh areas. There is no address search or map yet (M4).
+- There is no map, cafe details page or directions yet (M4).
+- Dark mode tokens exist, but nothing applies them yet. Privacy and terms pages are planned before production (M8).

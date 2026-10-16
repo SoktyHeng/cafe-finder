@@ -3,7 +3,7 @@
 | Milestone | Status |
 |---|---|
 | M0 — Repository foundation | ✅ Complete (2026-10-16) |
-| M1 — Discovery UI and location | Not started |
+| M1 — Discovery UI and location | ✅ Complete (2026-10-16) |
 | M2 — Google Places live provider | Not started |
 | M3 — Ranking and filters | Not started |
 | M4 — Maps and cafe details | Not started |
@@ -11,6 +11,53 @@
 | M6 — Original community amenities | Not started |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M1 — Discovery UI and location
+
+### Delivered
+
+- **Home page (`/`)**: the promise and the full search form. Submitting opens `/discover` with the search in the URL. No account is needed.
+- **Location**: "Use my current location" asks the browser only on click, with consent text. It handles denied, unavailable, timeout and unsupported cases and warns on low accuracy. The manual fallback is a searchable list of approximate Phnom Penh areas: matches on names and landmark aliases, and Enter picks the first match. Device coordinates are rounded to about 110 m.
+- **Filters**: purpose chips (Work/Study, Relax/Read, Friends, Date), distance slider (1 km up to the configured maximum), minimum rating, and open-now. The budget, Wi-Fi and quiet preferences carry an explicit "can't verify" disclaimer.
+- **`/discover`**: the URL holds the search, so results are bookmarkable and the back button works. Results are list-first on mobile, with an "Edit search" toggle, and use a two-column layout on desktop. States: idle, loading skeleton, results, empty (with exclusion counts), error (with retry where useful), and an invalid link reset.
+- **Cafe cards**: the source is labelled on the rating ("Google rating" or "Demo rating"), distance is shown as straight-line, and opening status names its source. Unknown values are labelled: "No rating yet", "Opening hours unknown", "Distance unknown". Cards also show a qualitative price level when present, a temporarily-closed badge, a "Demo data" badge, and the user's preferences as "Not verified for this cafe".
+- **`POST /api/places/nearby`**: Zod-validated, JSON only, at most 2 KB, configured maximum radius enforced, safe error contract. It is backed by `PlacesProvider` and `FixturePlacesProvider` (15 fictional cafes, including deliberately missing fields). See [api-contracts.md](api-contracts.md).
+- **Hard filters**: remove only positive evidence of a mismatch. Unrated cafes and unknown hours are kept and labelled.
+- An accessibility fix found by axe: the light-theme destructive colour was darkened, because red badge text failed WCAG AA contrast.
+
+### Acceptance verification (2026-10-16, Windows 11, Node 24.19.0)
+
+| Criterion | Evidence |
+|---|---|
+| User can complete the flow with location denied | E2E "location denied": permission cleared, blocked message shown, BKK1 picked through search, results rendered (desktop and mobile) |
+| No automatic billable search | E2E: 0 API calls while editing the radius, rating, open-now and purpose controls; exactly 1 per submit; 0 for an invalid link. Unit test: 1 fetch under React Strict Mode |
+| Accessible on mobile and desktop | axe-core WCAG 2.0, 2.1 and 2.2 A/AA scans show 0 violations on `/` and `/discover` (idle, results, empty) for both projects. E2E keyboard-only flow passes. Touch targets are at least 44 px. Results have a polite live region and errors use alerts |
+| Validated inputs | Server: strict Zod schema with no coercion, a field-name-only error message, body size limit and content-type check. Client: URL params validated, so invalid links are reset and never searched. Covered by unit and route tests |
+| Uses fixtures with clear labelling | Footer, results header and card badges all say "demo". Fixture IDs are `fixture-NNN` |
+
+Commands and results:
+
+| Command | Result |
+|---|---|
+| `pnpm lint` | Pass |
+| `pnpm typecheck` | Pass |
+| `pnpm test` | 18 files, 174 tests passed |
+| `pnpm build` | Pass: `/` and `/discover` static, `/api/places/nearby` dynamic |
+| `pnpm test:e2e` | 37 passed, 1 skipped (the mobile-only test on the desktop project) |
+
+### Deviations
+
+- DTO fields `googleRating` and `googleRatingCount` are renamed `rating` and `ratingCount`, because fixture data is not Google data. The source is always labelled.
+- Basic hard filters (rating and open-now, unknowns kept) were implemented in M1, so the M1 controls do something honest. Scoring, match reasons, confidence and one-click relaxation remain M3.
+- The "search bar" is a search over predefined areas. Address or place autocomplete would use a Google API and belongs to M2 or M4 after a cost and policy review.
+- See [architecture.md](architecture.md#deviations-from-claudemd) for the module placement deviations.
+
+### Remaining risks and follow-ups
+
+- No rate limiting yet. It is required before the live provider is enabled (M2).
+- Opening or reloading a `/discover` results URL runs that search once. That is user-initiated navigation, but it is billable once M2 is live. Revisit with rate limits.
+- The area centre coordinates are approximate and need verification before production.
+- Dark mode is still not applied.
 
 ## M0 — Repository foundation
 

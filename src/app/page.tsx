@@ -1,26 +1,17 @@
-import { Compass, ListChecks, MapPin } from "lucide-react";
+import { HomeDiscovery } from "@/features/discovery/components/home-discovery";
+import { getServerEnv } from "@/lib/config/server-env";
 
-const HOW_IT_WORKS = [
-  {
-    icon: MapPin,
-    title: "Share or choose a location",
-    body: "Use your current location with permission, or pick a spot manually. Search never requires an account.",
-  },
-  {
-    icon: Compass,
-    title: "Tell us what you need",
-    body: "Work, relax, meet friends or a date — plus radius, rating and open-now preferences.",
-  },
-  {
-    icon: ListChecks,
-    title: "Get explained recommendations",
-    body: "Every match shows why it ranked, and what we could not verify, such as Wi-Fi or quietness.",
-  },
+const PROMISES = [
+  "Search by what you're going for: work, relaxing, friends or a date.",
+  "Every result shows its rating, distance and opening status, and says what is unknown.",
+  "No account needed to search.",
 ] as const;
 
 export default function HomePage() {
+  const { MAX_SEARCH_RADIUS_METERS } = getServerEnv();
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-4 py-12 sm:px-6 sm:py-16">
+    <div className="mx-auto grid w-full max-w-5xl gap-10 px-4 py-10 sm:px-6 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:py-16">
       <section aria-labelledby="hero-heading" className="flex flex-col gap-4">
         <h1
           id="hero-heading"
@@ -28,31 +19,28 @@ export default function HomePage() {
         >
           Find the best cafe for you, right now.
         </h1>
-        <p className="max-w-2xl text-lg text-pretty text-muted-foreground">
-          Cafe Finder ranks nearby cafes by what matters to you and explains
-          each match honestly — including what is unknown.
+        <p className="max-w-xl text-lg text-pretty text-muted-foreground">
+          Tell us where you are and what you need. Cafe Finder shows cafes
+          nearby and explains each result honestly, including what we
+          can&apos;t verify.
         </p>
-        <p
-          role="status"
-          className="w-fit rounded-md border bg-secondary px-3 py-2 text-sm text-secondary-foreground"
-        >
-          Cafe search is under construction and not available yet.
-        </p>
-      </section>
-
-      <section aria-labelledby="how-heading" className="flex flex-col gap-6">
-        <h2 id="how-heading" className="text-xl font-semibold tracking-tight">
-          How it works
-        </h2>
-        <ol className="grid gap-4 sm:grid-cols-3">
-          {HOW_IT_WORKS.map(({ icon: Icon, title, body }) => (
-            <li key={title} className="flex flex-col gap-2 rounded-xl border bg-card p-5">
-              <Icon aria-hidden="true" className="size-6 text-primary" />
-              <h3 className="font-medium">{title}</h3>
-              <p className="text-sm text-muted-foreground">{body}</p>
+        <ul className="flex max-w-xl flex-col gap-2 text-sm text-muted-foreground">
+          {PROMISES.map((promise) => (
+            <li key={promise} className="flex gap-2">
+              <span aria-hidden="true" className="text-primary">
+                •
+              </span>
+              {promise}
             </li>
           ))}
-        </ol>
+        </ul>
+      </section>
+
+      <section
+        aria-label="Search for cafes"
+        className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6"
+      >
+        <HomeDiscovery maxRadiusMeters={MAX_SEARCH_RADIUS_METERS} />
       </section>
     </div>
   );
