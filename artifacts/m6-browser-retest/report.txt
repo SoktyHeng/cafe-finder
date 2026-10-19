@@ -1,0 +1,32 @@
+M6 browser retest — 2026-10-19 (Asia/Phnom_Penh)
+Environment: localhost:3000, existing signed-in Chrome account, LA. CHRONIQUE.
+Current-account-only scope retained from user instruction.
+
+Results:
+PASS: Wi-Fi Available report saves. Summary shows 1 report and correctly says there are not enough reports to affect recommendations. After reload, own report is preselected Available.
+PASS: Normal 4-star synthetic QA review publishes. After reload, text and rating persist. Own review shows You and no helpful/flag buttons.
+PASS: Updating own review to include synthetic local-format phone 012345678 yields Awaiting moderation: not public yet, the moderator-check confirmation, and Member reviews (0). Pending status persists after reload.
+FAIL: Updating own review with synthetic international-format number +1 202-555-0123 publishes it. UI says Your review is published, Member reviews (1), and renders the contact number in the review list. Expected: pending moderation, as required by the M6 checklist and community guidelines. Other-account visibility was not independently verified. Evidence: 03-phone-review-moderation.jpg (filename describes intended test, screenshot shows actual published result).
+EXPECTED ACCESS RESTRICTION: /moderation displays This page is only available to moderators.
+BLOCKED: Second-account helpful voting/flagging, cross-account visibility, moderator approval, and discovery evidence from two members. No second account or moderator available; no roles changed.
+
+Previous failures:
+The prior action-not-allowed errors for amenity and normal review submission did not recur.
+
+Reproduction of new phone-format bug:
+1. Open http://localhost:3000/cafes/ChIJId_HNd5QCTERT-Bx46uTi_4 in the current signed-in account.
+2. Choose 4 out of 5 and save a normal review.
+3. Update it to: M6 browser QA retest only. Synthetic contact number: +1 202-555-0123. This is not a real customer experience.
+4. Click Update review.
+5. Observe published confirmation and review in member list rather than pending moderation.
+6. Control test: replacing the body with M6 browser QA retest only. Synthetic phone number: 012345678. This is not a real customer experience. correctly holds it for moderation.
+
+Artifacts:
+01-normal-review.jpg — normal review published.
+02-persisted-contributions.jpg — full-page report and review after reload.
+03-phone-review-moderation.jpg — BUG: international number published.
+04-local-phone-result.jpg — local phone held with confirmation.
+05-pending-after-reload.jpg — pending review remains after reload.
+06-moderation-access.jpg — expected restriction for current account.
+
+Final test data: one Wi-Fi Available report and one pending synthetic local-phone review remain on LA. CHRONIQUE. No application code, database schema, or account roles were changed. Full M6 checklist remains incomplete.

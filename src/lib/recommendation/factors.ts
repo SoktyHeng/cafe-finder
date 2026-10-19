@@ -4,18 +4,29 @@ import type { CafePlace, PriceLevel } from "@/lib/places/schemas";
 
 import type { Factor, ScoringConfig } from "./config";
 
+/** A graded, sourced signal: 0–1 plus a short provenance note for explanations. */
+export type EvidenceSignal = {
+  score: number;
+  /** e.g. "3 reports, 1 confirmed visit, latest Oct 2026" */
+  detail: string;
+};
+
 /**
- * Evidence about a cafe that Google's standard fields don't provide. No source
- * exists yet; community reports (M6) will fill it. Until then every
- * atmosphere and amenity preference is "not verified".
+ * Evidence Google's standard fields don't provide: approved Cafe Finder
+ * member reports (M6), aggregated in lib/community. Anything absent stays
+ * "not verified". Never derived from Google data.
  */
 export type CafeEvidence = {
-  /** Label shown in reasons, e.g. "community reports". */
+  /** Label shown in reasons, e.g. "Cafe Finder members". */
   sourceLabel: string;
-  purposeFit?: Partial<Record<Purpose, boolean>>;
-  wifi?: boolean;
-  quiet?: boolean;
+  purposeFit?: Partial<Record<Purpose, EvidenceSignal>>;
+  wifi?: EvidenceSignal;
+  quiet?: EvidenceSignal;
 };
+
+/** Thresholds turning a graded signal into a reason, a caution, or "mixed". */
+const SIGNAL_POSITIVE = 0.7;
+const SIGNAL_NEGATIVE = 0.3;
 
 /** What one factor concluded, with the evidence-backed text that explains it. */
 export type FactorAssessment = {
@@ -119,15 +130,22 @@ export function assessOpenNow(cafe: CafePlace): FactorAssessment {
 export function assessAtmosphere(purpose: Purpose, evidence: CafeEvidence | undefined): FactorAssessment {
   const { atmosphere } = purposeOption(purpose);
   const fit = evidence?.purposeFit?.[purpose];
-  if (fit === true) {
-    return assessment("atmosphere", 1, { reasons: [`${atmosphere} (${evidence?.sourceLabel})`] });
+  if (!fit || !evidence) {
+    return assessment("atmosphere", null, { unverified: [atmosphere] });
   }
-  if (fit === false) {
-    return assessment("atmosphere", 0, {
-      cautions: [`Reported as not ${atmosphere.toLowerCase()} (${evidence?.sourceLabel})`],
+  const source = `${evidence.sourceLabel}: ${fit.detail}`;
+  const score = clamp01(fit.score);
+  if (score >= SIGNAL_POSITIVE) {
+    return assessment("atmosphere", score, { reasons: [`${atmosphere}, according to ${source}`] });
+  }
+  if (score <= SIGNAL_NEGATIVE) {
+    return assessment("atmosphere", score, {
+      cautions: [`Reported as not ${atmosphere.toLowerCase()} (${source})`],
     });
   }
-  return assessment("atmosphere", null, { unverified: [atmosphere] });
+  return assessment("atmosphere", score, {
+    cautions: [`Partly ${atmosphere.toLowerCase()} (${source})`],
+  });
 }
 
 type RequestedBudget = Exclude<Budget, "any">;
@@ -171,18 +189,34 @@ export function assessAmenities(
   const cautions: string[] = [];
   const unverified: string[] = [];
   const known: number[] = [];
-  const check = (wanted: boolean | undefined, value: boolean | undefined, name: string) => {
+  const check = (
+    wanted: boolean | undefined,
+    signal: EvidenceSignal | undefined,
+    name: string,
+    wording: { yes: string; no: string; mixed: string },
+  ) => {
     if (!wanted) return;
-    if (value === undefined) {
+    if (!signal || !evidence) {
       unverified.push(name);
       return;
     }
-    known.push(value ? 1 : 0);
-    if (value) reasons.push(`${name} reported (${evidence?.sourceLabel})`);
-    else cautions.push(`No ${name.toLowerCase()} reported (${evidence?.sourceLabel})`);
+    const score = clamp01(signal.score);
+    known.push(score);
+    const source = `${evidence.sourceLabel}: ${signal.detail}`;
+    if (score >= SIGNAL_POSITIVE) reasons.push(`${wording.yes} (${source})`);
+    else if (score <= SIGNAL_NEGATIVE) cautions.push(`${wording.no} (${source})`);
+    else cautions.push(`${wording.mixed} (${source})`);
   };
-  check(request.preferWifi, evidence?.wifi, "Wi-Fi");
-  check(request.preferQuiet, evidence?.quiet, "Quiet");
+  check(request.preferWifi, evidence?.wifi, "Wi-Fi", {
+    yes: "Wi-Fi reported",
+    no: "Reported to have no Wi-Fi",
+    mixed: "Wi-Fi not reliably available",
+  });
+  check(request.preferQuiet, evidence?.quiet, "Quiet", {
+    yes: "Reported as quiet",
+    no: "Reported as loud",
+    mixed: "Not reliably quiet",
+  });
 
   const score = known.length > 0 ? known.reduce((sum, value) => sum + value, 0) / known.length : null;
   return assessment("amenities", score, { reasons, cautions, unverified });

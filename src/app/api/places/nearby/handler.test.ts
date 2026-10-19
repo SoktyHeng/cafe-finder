@@ -10,7 +10,9 @@ import { apiErrorBodySchema } from "@/lib/security/api-error";
 import { FixedWindowRateLimiter } from "@/lib/security/rate-limit";
 import { createRequestGuard, type RequestGuard } from "@/lib/security/request-guard";
 
-import { MAX_BODY_BYTES, createNearbySearchHandler } from "./handler";
+import type { AmenitySummary } from "@/lib/community/schemas";
+
+import { MAX_BODY_BYTES, createNearbySearchHandler, type NearbyHandlerDeps } from "./handler";
 
 const FIXED_NOW = new Date("2026-10-16T00:00:00.000Z");
 
@@ -252,5 +254,64 @@ describe("POST /api/places/nearby", () => {
     expect(body.source).toBe("google");
     expect(body.results.map((result) => result.cafe.placeId)).toEqual(["ChIJa"]);
     expect(body.attributions).toEqual([{ provider: "Example Data Co" }]);
+  });
+});
+
+describe("community evidence (M6)", () => {
+  const summary = (overrides: Partial<AmenitySummary> = {}): AmenitySummary => ({
+    amenity: "wifi",
+    consensus: "yes",
+    agreement: 1,
+    score: 1,
+    reportCount: 3,
+    confirmedVisitCount: 2,
+    latestObservedOn: "2026-10-10",
+    conflicted: false,
+    sufficient: true,
+    ...overrides,
+  });
+
+  function withCommunity(getCommunity: NonNullable<NearbyHandlerDeps["getCommunity"]>) {
+    return createNearbySearchHandler({
+      getEnv: () => ({ PLACES_PROVIDER: "fixture", GOOGLE_PLACES_SERVER_API_KEY: undefined, MAX_SEARCH_RADIUS_METERS: 15_000 }),
+      getProvider: () => new FixturePlacesProvider(),
+      guard: () => () => null,
+      getCommunity,
+      now: () => FIXED_NOW,
+    });
+  }
+
+  it("ranks with sufficient member evidence and attaches summaries separately from cafe data", async () => {
+    const getCommunity = vi.fn(async (ids: string[]) => new Map([[ids[0] as string, [summary()]]]));
+    const body = nearbySearchResponseSchema.parse(
+      await (await withCommunity(getCommunity)(post({ ...VALID_BODY, preferWifi: true }))).json(),
+    );
+    const withReports = body.results.find((result) => result.community);
+    expect(withReports?.community).toEqual([summary()]);
+    expect(withReports?.knownMatchReasons.join(" ")).toMatch(/Wi-Fi reported \(Cafe Finder members: 3 reports, 2 confirmed visits/);
+    expect(withReports?.unverifiedPreferences).not.toContain("Wi-Fi");
+    // Google/fixture fields are untouched by member data.
+    expect(Object.keys(withReports?.cafe ?? {})).not.toContain("community");
+    // Others remain unverified.
+    expect(body.results.filter((result) => !result.community).every((result) => result.unverifiedPreferences.includes("Wi-Fi"))).toBe(true);
+    expect(getCommunity).toHaveBeenCalledOnce();
+  });
+
+  it("shows but does not rank on insufficient evidence", async () => {
+    const getCommunity = vi.fn(async (ids: string[]) => new Map([[ids[0] as string, [summary({ sufficient: false, reportCount: 1 })]]]));
+    const body = nearbySearchResponseSchema.parse(
+      await (await withCommunity(getCommunity)(post({ ...VALID_BODY, preferWifi: true }))).json(),
+    );
+    const withReports = body.results.find((result) => result.community);
+    expect(withReports?.unverifiedPreferences).toContain("Wi-Fi");
+  });
+
+  it("still answers when community data fails", async () => {
+    const response = await withCommunity(async () => {
+      throw new Error("supabase down");
+    })(post(VALID_BODY));
+    expect(response.status).toBe(200);
+    const body = nearbySearchResponseSchema.parse(await response.json());
+    expect(body.results.every((result) => result.community === undefined)).toBe(true);
   });
 });

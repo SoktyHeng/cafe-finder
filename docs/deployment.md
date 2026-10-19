@@ -51,6 +51,28 @@ Without Supabase, the site runs in **guest-only mode**. Search, map and details 
 7. "Continue with Google" works.
 8. Delete the account at `/account`. In the Supabase table editor, that user's rows are gone.
 
+## Community moderation (M6)
+
+Apply `20261019031354_m6_community.sql` with `supabase db push`, as for M5.
+
+**Add a moderator.** Find the user's ID under **Authentication → Users**, then run this as an admin in the **SQL Editor**:
+
+```sql
+insert into public.moderators (user_id) values ('<user-uuid>');
+-- remove: delete from public.moderators where user_id = '<user-uuid>';
+```
+
+Moderators get a "Moderation" page at `/moderation` showing pending reviews and flagged content, with Approve and Reject. Every decision is recorded in `moderation_events`. There's no in-app way to become a moderator.
+
+**Security advisor.** `supabase db advisors --linked` reports WARN-level findings about callable `SECURITY DEFINER` functions: `community_amenity_reports`, `community_reviews`, `am_i_moderator`, `moderation_queue`, `moderate_content` and `delete_own_account`. These are accepted. Each one checks its caller, uses `search_path = ''`, and returns anonymized data only. Enable **leaked password protection**, the other warning, in the dashboard.
+
+**Manual live check** (two accounts, A and B):
+1. As A, report Wi-Fi on a cafe's details page and post a review. Both appear.
+2. Post a review containing a phone number. It says a moderator will check it first, and others don't see it.
+3. As B, mark A's review "Helpful", then report it. Neither control appears on B's own review.
+4. As a moderator, open `/moderation`. Approve the held review; it becomes visible.
+5. On `/discover`, a cafe with reports from two members shows "From Cafe Finder members (not Google)" on its card.
+
 ## Application configuration
 
 | Variable | Default | Notes |

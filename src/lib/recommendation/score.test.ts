@@ -228,25 +228,53 @@ describe("factors: atmosphere and amenities (evidence only)", () => {
     expect(factorScore("complete", result, "atmosphere")).toBeNull();
   });
 
-  it("uses explicit evidence with its source when provided", () => {
+  const signal = (score: number, detail = "2 reports") => ({ score, detail });
+
+  it("uses graded member evidence, citing its source and provenance", () => {
     const evidence: CafeEvidence = {
-      sourceLabel: "community reports",
-      purposeFit: { work: true },
-      wifi: true,
-      quiet: false,
+      sourceLabel: "Cafe Finder members",
+      purposeFit: { work: signal(0.9, "3 member reports on laptop-friendly") },
+      wifi: signal(1, "2 reports, 1 confirmed visit, latest Oct 2026"),
+      quiet: signal(0, "2 reports, latest Sep 2026"),
     };
     const result = scoreCafe(COMPLETE, { ...REQUEST, preferWifi: true, preferQuiet: true }, DEFAULT_SCORING_CONFIG, evidence);
-    expect(factorScore("complete", result, "atmosphere")).toBe(1);
+    expect(factorScore("complete", result, "atmosphere")).toBe(0.9);
     expect(factorScore("complete", result, "amenities")).toBe(0.5);
     expect(result.knownMatchReasons).toEqual(
-      expect.arrayContaining(["Good for work or study (community reports)", "Wi-Fi reported (community reports)"]),
+      expect.arrayContaining([
+        "Good for work or study, according to Cafe Finder members: 3 member reports on laptop-friendly",
+        "Wi-Fi reported (Cafe Finder members: 2 reports, 1 confirmed visit, latest Oct 2026)",
+      ]),
     );
-    expect(result.cautions).toContain("No quiet reported (community reports)");
+    expect(result.cautions).toContain("Reported as loud (Cafe Finder members: 2 reports, latest Sep 2026)");
     expect(result.unverifiedPreferences).toEqual([]);
   });
 
+  it.each([
+    [0.5, "Wi-Fi not reliably available", "Not reliably quiet", "Partly good for work or study"],
+  ])("states middling evidence (%d) honestly", (score, wifiText, quietText, workText) => {
+    const evidence: CafeEvidence = {
+      sourceLabel: "Cafe Finder members",
+      purposeFit: { work: signal(score) },
+      wifi: signal(score),
+      quiet: signal(score),
+    };
+    const result = scoreCafe(COMPLETE, { ...REQUEST, preferWifi: true, preferQuiet: true }, DEFAULT_SCORING_CONFIG, evidence);
+    const cautions = result.cautions.join(" | ");
+    for (const text of [wifiText, quietText, workText]) expect(cautions).toContain(text);
+    expect(result.knownMatchReasons.join(" ")).not.toMatch(/wi-?fi|quiet|work/i);
+  });
+
+  it("clamps out-of-range signals", () => {
+    const result = scoreCafe(COMPLETE, { ...REQUEST, preferWifi: true }, DEFAULT_SCORING_CONFIG, {
+      sourceLabel: "x",
+      wifi: signal(7),
+    });
+    expect(factorScore("complete", result, "amenities")).toBe(1);
+  });
+
   it("ignores evidence for preferences that were not requested", () => {
-    const result = scoreCafe(COMPLETE, REQUEST, DEFAULT_SCORING_CONFIG, { sourceLabel: "x", wifi: true });
+    const result = scoreCafe(COMPLETE, REQUEST, DEFAULT_SCORING_CONFIG, { sourceLabel: "x", wifi: signal(1) });
     expect(result.factors.map((item) => item.factor)).not.toContain("amenities");
     expect(result.knownMatchReasons.join(" ")).not.toMatch(/wi-?fi/i);
   });
@@ -307,9 +335,9 @@ describe("rankCafes", () => {
 
   it("applies evidence by place ID", () => {
     const ranked = rankCafes([COMPLETE], { ...REQUEST, preferWifi: true }, {
-      evidenceByPlaceId: new Map([["complete", { sourceLabel: "community reports", wifi: true }]]),
+      evidenceByPlaceId: new Map([["complete", { sourceLabel: "Cafe Finder members", wifi: { score: 1, detail: "2 reports" } }]]),
     });
-    expect(ranked[0]?.knownMatchReasons).toContain("Wi-Fi reported (community reports)");
+    expect(ranked[0]?.knownMatchReasons).toContain("Wi-Fi reported (Cafe Finder members: 2 reports)");
   });
 });
 

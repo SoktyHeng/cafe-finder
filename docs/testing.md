@@ -18,6 +18,18 @@
 - E2E runs a **production build** in fixture mode on port 3100 (`reuseExistingServer` outside CI). E2E must never call Google or Supabase. Upstream APIs are mocked from M2 onward.
 - Default CI must never call Google APIs.
 
+## Community tests (M6)
+
+| Test | Covers |
+|---|---|
+| `src/test/db/community.test.ts` | 36 tests on the real migrations in PGlite, sharing [harness.ts](../src/test/db/harness.ts) with the RLS suite. Covers:<br>• own-row isolation, and that members can't set `status`<br>• one answer per amenity, and the allowed values<br>• review moderation patterns (URL, email, phone) without false positives on opening hours<br>• no self-votes or self-flags, and auto-hide at 3 flags<br>• moderator-only queue and decisions, with audit<br>• anonymized public reads for anon, with no table access<br>• daily caps<br>• account-deletion cascade<br>• upserts in the exact `insert … on conflict … do update set <all payload columns>` form PostgREST sends, and that key columns still can't change |
+| `lib/community/aggregate.test.ts` | Weights, decay, consensus ties, sufficiency, conflicts, and the mapping to recommendation evidence |
+| `lib/community/handlers.test.ts` | Public reads, 401 for guest writes, CSRF, strict schemas, error mapping without leaks, rate limits, moderator-only routes |
+| `lib/community/supabase-store.test.ts` | Database error mapping, RPC row mapping, upsert conflict targets (never sends `status` or `user_id`) |
+| `features/community/components/community-ui.test.tsx` | No requests in guest-only mode. Labelled member summaries. Sign-in prompt. Report and review forms and their validation. Pending-review message. Vote and flag only on others' reviews |
+| `lib/recommendation/score.test.ts`, `api/places/nearby/handler.test.ts` | Graded evidence wording and its effect on rank. Search proceeds when community data fails |
+| `tests/e2e/guest-mode.spec.ts` | Guest-only details page makes no community request. Guidelines page linked from the footer, passing axe. `/moderation` unavailable. Community API returns 503 and refuses cross-site writes |
+
 ## Auth and user data tests (M5)
 
 | Test | Covers |

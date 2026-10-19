@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CommunityBadges } from "@/features/community/components/community-badges";
 import { FavoriteButton } from "@/features/favorites/components/save-buttons";
 import { directionsUrl } from "@/lib/google/maps-urls";
 import type { Recommendation } from "@/lib/recommendation/schemas";
@@ -114,6 +115,8 @@ export function CafeCard({
           </li>
         )}
       </ul>
+
+      <CommunityBadges summaries={recommendation.community} />
 
       <div className="flex flex-wrap gap-2">
         <Button asChild size="lg" className={ACTION_CLASS}>

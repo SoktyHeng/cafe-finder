@@ -72,7 +72,13 @@ function renderDetails(placeId: string, response: Response | (() => Response), f
   // Unique IDs keep the shared in-flight request map from leaking between tests.
   nav.placeId = placeId;
   nav.from = from;
-  fetchMock.mockImplementation(async () => (typeof response === "function" ? response() : response.clone()));
+  fetchMock.mockImplementation(async (url) =>
+    String(url).startsWith("/api/community/")
+      ? new Response(JSON.stringify({ error: { code: "UPSTREAM_UNAVAILABLE", message: "x" } }), { status: 503 })
+      : typeof response === "function"
+        ? response()
+        : response.clone(),
+  );
   render(<CafeDetailsView />);
   return userEvent.setup();
 }
@@ -88,6 +94,7 @@ afterEach(() => {
 });
 
 const googleId = () => `ChIJdetails${uniqueId}`;
+const detailsCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith("/api/places/"));
 const withId = (body: PlaceDetailsResponse, placeId: string): PlaceDetailsResponse => ({
   ...body,
   place: { ...body.place, placeId },
@@ -99,7 +106,8 @@ describe("CafeDetailsView: Google place", () => {
     renderDetails(id, json(withId(GOOGLE_DETAILS, id)), "area=bkk1&purpose=work&radius=3000");
 
     expect(await screen.findByRole("heading", { level: 1, name: "Real Cafe" })).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(`/api/places/${id}`, { method: "GET" });
+    // Exactly one details call (community data is a separate endpoint).
+    expect(detailsCalls()).toEqual([[`/api/places/${id}`, { method: "GET" }]]);
     expect(screen.getByText("4.6 Google rating from 412 reviews")).toBeInTheDocument();
     expect(screen.getByText("Open now (according to Google)")).toBeInTheDocument();
     expect(screen.getByText(/from Boeung Keng Kang 1 \(BKK1\) \(straight line\)/)).toBeInTheDocument();
@@ -216,7 +224,7 @@ describe("CafeDetailsView: states", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("temporarily unavailable");
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Real Cafe" })).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(detailsCalls()).toHaveLength(2));
   });
 });
 

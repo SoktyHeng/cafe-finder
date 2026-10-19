@@ -159,3 +159,47 @@ Errors:
 | `/login` | Email/password sign-in and sign-up (server actions), and "Continue with Google". `?next=` must be a same-site path; anything else falls back to `/` |
 | `/auth/callback` | OAuth return: exchanges the PKCE `code` for a session, then redirects to `next`. Failure goes to `/login?error=oauth` |
 | `/auth/confirm` | Email links: `verifyOtp({ token_hash, type })`, then redirects to `next`. Failure goes to `/login?error=confirm` |
+
+## Community (M6)
+
+Member contributions about a place: amenity reports, one review per member, helpful votes and flags. This is **first-party data, kept separate from Google content**. Reads are public; writes need a session. Every response is `Cache-Control: private, no-store`.
+
+| Route | Methods | Body / query | Success |
+|---|---|---|---|
+| `/api/community/[placeId]` | GET | | `{ placeId, amenities: AmenitySummary[], reviews: CommunityReview[], mine }`. `mine` is `null` for guests, otherwise `{ reports, review, votes, flaggedReviewIds }` |
+| `/api/community/[placeId]/amenities` | PUT | `{ answers: [{ amenity, value }], observedOn: "YYYY-MM-DD" }`, with 1–5 answers and no amenity repeated | 204. Upsert: one answer per member, place and amenity |
+| | DELETE | `?amenity=` | 204 |
+| `/api/community/[placeId]/review` | PUT | `{ rating: 1–5, body: 20–1000 characters }` | `{ status: "approved" }` or `{ status: "pending" }`. Pending means a moderator checks it first |
+| | DELETE | | 204 |
+| `/api/community/reviews/[reviewId]/vote` | PUT | `{ helpful: boolean }` | 204. Not on your own review |
+| | DELETE | | 204 |
+| `/api/community/flags` | POST | `{ targetType: "amenity_report" or "review", targetId, reason }`. Reasons: spam, offensive, incorrect, personal_info, other | 201 `{ flagged: true }`. Once per member per item, never your own |
+| `/api/moderation` | GET | | `{ items }`: pending and flagged content. Moderators only |
+| | POST | `{ targetType, targetId, decision: "approved" or "rejected" }` | 204. Audited |
+
+Amenities and their values:
+
+| Amenity | Values |
+|---|---|
+| `wifi` | yes, no |
+| `outlets` | many, some, none |
+| `noise` | quiet, moderate, loud |
+| `seating` | comfortable, ok, uncomfortable |
+| `laptop_friendly` | yes, no |
+
+`observedOn` must fall within the last 365 days.
+
+- **Summaries, not rows.** `amenities` are aggregates: consensus, agreement, report and confirmed-visit counts, latest date, `sufficient` and `conflicted`. Individual reports are never returned. Reviews never include user IDs or names, only `isOwn` and `confirmedVisit`.
+- **Only approved content** appears in reads or affects ranking.
+- **Protections** match the user-data routes: a CSRF check on mutations, strict schemas, and JSON bodies of at most 4 KB.
+- **Rate limits:** 60 reads per minute per member or client, and 30 writes per minute per member. Postgres adds daily and total caps per member (see [data-model.md](data-model.md#community-m6)).
+
+Errors:
+- `401 AUTH_REQUIRED`: a write without a session.
+- `503 UPSTREAM_UNAVAILABLE`: Supabase isn't configured or can't be reached.
+- `429 RATE_LIMITED`: the request rate or the daily contribution cap.
+- `403 FORBIDDEN`: voting on or flagging your own content, content that isn't visible, or a non-moderator calling `/api/moderation`.
+- `400 VALIDATION_ERROR`: invalid input, a duplicate flag, or a value the database rejects.
+- `404 NOT_FOUND`: the item no longer exists.
+
+`POST /api/places/nearby` results gain an optional `community: AmenitySummary[]` per cafe (see [recommendation-scoring.md](recommendation-scoring.md#community-evidence-m6)). If the community lookup fails or takes more than 2 seconds, search continues without it.

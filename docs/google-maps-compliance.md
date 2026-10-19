@@ -49,7 +49,8 @@ Field-mask subpaths such as `currentOpeningHours.openNow` are not documented, so
 ## Caching and storage
 
 - Google content is **not cached or persisted**. Every response is fetched per request and sent with `Cache-Control: no-store`. Nothing is written to a database.
-- Place IDs may be stored indefinitely (policy exemption). From M5 they will be the only stored Google data.
+- Place IDs may be stored indefinitely (policy exemption). They are the only stored Google data: favorites and visits (M5), and member reports, reviews and flags (M6) reference places by ID only.
+- Member contributions are original first-party content. Google reviews are never copied into them, and Google data is never used to pre-fill or infer them.
 - Photo names are never cached ("You cannot cache a photo name"). The photo endpoint resolves a fresh name each time and redirects with `no-store`. An expired name returns 404 so the client can refetch details.
 - Latitude and longitude from Google are used only within a request, for straight-line distance and map markers.
 - Photos are shown with plain `<img>` tags pointing at our photo endpoint, not `next/image`, which would fetch and cache Google content on our server. Reviews and photos are never stored.
@@ -65,7 +66,7 @@ Field-mask subpaths such as `currentOpeningHours.openNow` are not documented, so
 | Review author credit (name, photo, profile link) | Each review shows the author's name (linked), their photo, rating and relative time, plus "Translated by Google" when the text was translated. Review text is shown unedited, under "Reviews from Google" ([reviews-list.tsx](../src/features/cafes/components/reviews-list.tsx)). Reviews without an author are dropped |
 | Places data on a map must use a Google Map | The map is Maps JavaScript API only, with Google's own logo, attribution and controls left visible and uncovered. No other basemap is used |
 | Attribution when the map isn't shown | The list and details page keep the "Google Maps" text attribution, because on small screens the list is often shown without the map |
-| No Google content mixed into our own ratings | Ratings are always labelled "Google rating". Community data (M6) stays separate |
+| No Google content mixed into our own ratings | Ratings are always labelled "Google rating". Member content (M6) is shown in its own sections labelled "From Cafe Finder members (not Google)". The details page separates "Amenities from Google" and "Reviews from Google" from member reports and reviews |
 
 **Follow-up before production:** use the official Google Maps logo asset where space allows, which the policy prefers. The current text attribution fits the compact results header.
 

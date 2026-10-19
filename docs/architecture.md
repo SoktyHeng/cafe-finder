@@ -1,6 +1,6 @@
 # Architecture
 
-The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M5).
+The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M6).
 
 ```text
 Browser
@@ -22,6 +22,7 @@ Server
        │     ├─ FixturePlacesProvider (fictional demo cafes)
        │     └─ GooglePlacesProvider → normalize ← GooglePlacesClient (lib/google/, server only)
        │                                              └─ places.googleapis.com (key in header)
+       ├─ loadCommunitySummaries (approved member reports, 2 s timeout)          lib/community/
        ├─ applyHardFilters → withDistance → rankCafes (weighted, explainable)   lib/recommendation/
        └─ apiError (safe error contract)            lib/security/
 ```
@@ -58,6 +59,9 @@ Server
 | `lib/user-data/` | Zod contracts, the `UserDataStore` interface, the RLS-scoped Supabase store, route handlers (CSRF, auth, rate limit), and favorites summaries (Place Details Pro) |
 | `features/auth/` | Server actions (sign-in, sign-up, Google), `AuthProvider` (UI state), login and account views |
 | `features/favorites/` | `SavedPlacesProvider` (optimistic favorite and visited toggles), Save and Visited buttons, favorites view |
+| `lib/community/` | M6 member content. Zod contracts, the trust model and aggregation (`aggregate.ts`), store interfaces and the Supabase store (RPCs for public reads, RLS-scoped writes), route handlers, and `context.ts` (session client for members, the anonymous client for guests) |
+| `lib/http/route-helpers.ts` | Shared route plumbing: same-origin check, JSON body limit, validation, `private, no-store` responses |
+| `features/community/` | Data hook and mutations, card badges, the details-page section (summaries, report form, own review, member reviews with vote and flag), moderation view |
 | `lib/http/request-api.ts`, `hooks/use-keyed-request.ts` | Typed API calls that never throw, and deduplicated one-call-per-action requests (shared by search and details) |
 
 ## Key decisions
@@ -71,6 +75,7 @@ Server
 - **Map lifecycle.** The Maps JavaScript API loads only when a map is first shown: always on wide screens, after "Map" is chosen on narrow ones. The map is then kept mounted. Selection changes only pan the map and restyle markers. A new search remounts the view, which resets selection and framing. Without a key, or on a load or auth failure, the map is replaced by a fallback and the list keeps working.
 - **Auth boundary.** The browser reads only sign-in *state*, for buttons. Every protected page and API route verifies the JWT on the server (`getClaims`) and queries Supabase *as the user*, so RLS is the final gate. The proxy redirects signed-out visitors from `/favorites` and `/account` as an optimistic check; the pages check again.
 - **Guest-first.** Search, map and details never need an account. Without Supabase configured, all sign-in UI is hidden.
+- **Community data is separate evidence.** Member reports never alter Google fields. They're aggregated into anonymized summaries and passed to the scorer as separately labelled `CafeEvidence`. Only approved content is read. Status is controlled by database triggers and moderators, never by clients. Community failures never break search or details.
 - **Saved data stores IDs only.** Favorites and visits store Google place IDs and user-authored notes. Names and addresses are refetched per view with a Pro-tier summary mask: at most 50 per page, 5 at a time, 10 page loads per user per minute.
 - **Key separation.** The public browser key (Maps JavaScript API) and the server key (Places) are distinct. `instrumentation.ts` refuses to start if they're equal.
 

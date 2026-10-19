@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formValuesToSearchParams, searchParamsToFormValues } from "@/features/discovery/url-state";
+import { CommunitySection } from "@/features/community/components/community-section";
 import { FavoriteButton, VisitedButton } from "@/features/favorites/components/save-buttons";
 import { haversineMeters } from "@/lib/geo/distance";
 import { directionsUrl } from "@/lib/google/maps-urls";
@@ -255,8 +256,12 @@ function Details({ data, origin }: { data: PlaceDetailsResponse; origin: BackLin
         />
       </Section>
 
-      <Section title="Amenities">
+      <Section title={isGoogle ? "Amenities from Google" : "Amenities"}>
         <AmenitiesList amenities={place.amenities} source={source} />
+      </Section>
+
+      <Section title="From Cafe Finder members">
+        <CommunitySection placeId={place.placeId} placeName={name} />
       </Section>
 
       {isGoogle && (

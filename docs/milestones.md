@@ -8,9 +8,86 @@
 | M3 — Ranking and filters | ✅ Complete (2026-10-16) |
 | M4 — Maps and cafe details | ✅ Complete, including live map verification (2026-10-16) |
 | M5 — Auth and favorites | ✅ Implemented and verified offline (2026-10-16). Live sign-in awaits a Supabase project |
-| M6 — Original community amenities | Not started |
+| M6 — Original community amenities | ✅ Complete, including live database verification (2026-10-19). Upsert permission fix applied the same day |
 | M7 — Optional natural-language discovery | Not started |
 | M8 — Production readiness and launch | Not started |
+
+## M6 — Original community amenities
+
+### Delivered
+
+- **Database** ([20261019031354_m6_community.sql](../supabase/migrations/20261019031354_m6_community.sql), documented in [data-model.md](data-model.md#community-m6)):
+  - Tables: `amenity_reports` (Wi-Fi, outlets, noise, seating, laptop-friendly), `place_reviews`, `review_votes`, `content_flags`, `moderators` and `moderation_events`.
+  - Places are referenced by Google place ID only.
+  - **Duplicate prevention:** one answer per member, place and amenity; one review per member and place; one vote per member and review; one flag per member and item. Re-submitting updates the existing row.
+  - **Limits:** daily and total caps per member, enforced by triggers.
+  - **Status:** clients can't write it. Reviews containing a URL, email or phone number start pending. Edits to moderated content return to pending. Flags from 3 members hide content automatically.
+  - **Access:** RLS on own rows, column-level grants, helpers in a `private` schema, and anonymized `SECURITY DEFINER` read functions that return approved content only.
+  - **Visit confirmation:** reports and reviews from members who marked the place visited (M5 `visit_feedback`) are labelled "Confirmed visit" and weigh double.
+- **Aggregation** ([lib/community/aggregate.ts](../src/lib/community/aggregate.ts)):
+  - Weighted consensus per amenity, with 180-day decay and the sufficiency and conflict rules described in [recommendation-scoring.md](recommendation-scoring.md#community-evidence-m6).
+- **Recommendations:**
+  - Sufficient member summaries become graded `CafeEvidence` for Wi-Fi, quiet, and work or relax fit.
+  - Every reason names "Cafe Finder members" and the evidence (report count, confirmed visits, latest date).
+  - If community data is unavailable, search ranks on Google data alone.
+- **API:** `/api/community/[placeId]` (public read), `…/amenities`, `…/review`, `/api/community/reviews/[id]/vote`, `/api/community/flags` and `/api/moderation`.
+  - CSRF checks, strict schemas and per-member rate limits.
+  - Database errors map to safe messages.
+  - Shared route plumbing was extracted to `lib/http/route-helpers.ts`.
+- **UI:**
+  - Cards show "From Cafe Finder members (not Google)" badges.
+  - The details page has a member section: summaries with counts and dates, a report form, the member's own review, and member reviews with Helpful/Not helpful and Report. The Google sections were renamed "Amenities from Google" and "Reviews from Google".
+  - `/moderation` (moderators only) and `/community-guidelines` (rules, moderation, privacy), linked from the footer.
+
+### Acceptance verification (2026-10-19)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Community info is separately sourced, never presented as Google data | ✅ | Separate tables and DTO field (`community`), with no Google data stored. Every badge, section and reason is labelled "Cafe Finder members". Google sections are labelled "from Google". Covered by component and scoring tests |
+| Abuse mitigation in place | ✅ | Uniqueness constraints, daily and total caps, API rate limits, review moderation patterns, auto-hide at 3 flags, no self-votes or self-flags, moderator-only decisions with an audit trail. 36 database tests plus handler tests |
+| Privacy policies in place | ✅ | `/community-guidelines` covers what's public, what's never shown (user IDs, names), deletion, and moderation. Public reads are anonymized. Account deletion cascades to all member content (tested). The full privacy page remains an M8 item |
+| Only approved content influences recommendations | ✅ | The read functions return `status = 'approved'` rows only. Aggregation uses sufficient summaries only. Tested in PGlite and in the handler |
+| RLS and cross-user isolation | ✅ | **PGlite:** own-row isolation, column grants, anon denied. **Live, hosted project** (rolled back afterwards, nothing kept): member B saw 0 of member A's rows and edited 0 rows; A couldn't set `status`, flag their own review, or open the moderation queue; a phone-number review was held as pending; anon could read only the anonymized functions |
+| Running app against live Supabase | ✅ | Public GET returns 200. A cross-site PUT gets 403. A PUT without a session gets 401. `/moderation` signed out redirects to login |
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 46 files, 610 tests passed, including 56 database tests on real Postgres |
+| `pnpm build` | Pass |
+| `pnpm test:e2e` | 97 passed, 3 skipped (viewport-specific) |
+| `pnpm check:secrets` | Pass (679 build files) |
+| `supabase db advisors --linked` | WARN only: intentional `SECURITY DEFINER` functions (accepted, see [deployment.md](deployment.md#community-moderation-m6)) and leaked password protection off (a dashboard setting) |
+
+### Bugs found and fixed while building
+
+- **The status trigger referenced `new.body` for amenity reports.** It would have failed at run time on every report. Each branch now touches only its own table's columns.
+- **"permission denied for schema private".** The trigger called a private helper with the member's privileges. The check is now inlined.
+- **The phone pattern flagged opening hours** such as "7.00 - 21.00". It was replaced with word-bounded structured patterns.
+- **`is_own` was NULL for guests.** It's now coalesced to false.
+- **Every report, review and vote save failed live with "That action isn't allowed on this item"** (found in manual testing, 2026-10-19).
+  - Cause: supabase-js `upsert()` becomes `insert … on conflict … do update set <all payload columns>`, and Postgres requires UPDATE privilege on each of them, including the key columns. Only content columns had been granted. The database tests and the first live check used plain `INSERT`, so they missed it.
+  - Fix: migration `20261019035245_m6_upsert_grants.sql` grants UPDATE on the key columns and adds a trigger that rejects actual key changes.
+  - Regression tests now issue upserts in PostgREST's exact form. A rolled-back live check on the hosted project confirmed: report create and update, review approved, phone-number review pending, vote create and change, and moving a report rejected.
+- **A same-day report weighed 0.998**, just under the sufficiency threshold. Age is now counted in whole days.
+- **UI:** the confirmation message vanished when the section refreshed. Previous data is now kept while reloading. The rating radios' accessible name read "5out of 5"; it's now a single "5 out of 5" label.
+
+### Decisions and deviations
+
+- Status starts **approved** (post-moderation) rather than pending. This keeps contributions useful at small scale while flags, caps and the review patterns limit abuse. Switching to pre-moderation means changing the default in the trigger.
+- Moderators are added by an admin in SQL. There's no in-app moderator management.
+- CLAUDE.md's `amenity` and `value` columns are kept as text, constrained by check constraints, not enums.
+- Reviews are anonymous ("Cafe Finder member"), so no names are exposed.
+- Friends and date fit have no member question, so they stay unknown.
+- E2E runs in guest-only mode. Signed-in flows are covered by component, handler and database tests, the live SQL check, and the manual checklist in [deployment.md](deployment.md#community-moderation-m6).
+
+### Remaining risks and follow-ups
+
+- Signed-in UI flows (report, review, vote, flag, moderate) haven't been clicked through in a browser against the live project yet. Follow the manual checklist.
+- The review patterns are a basic filter. Determined spam needs flags and moderators. Consider a moderation SLA and notifications in M8.
+- The rate limiters are in memory, per instance; database caps are the hard limit.
+- Trust weights (1 vs 0.5, a 180-day half-life, a sufficiency threshold of 1) are hypotheses. Recalibrate them once real reports exist.
+- The privacy page and terms (M8) must cover member content.
 
 ## M5 — Auth and favorites
 

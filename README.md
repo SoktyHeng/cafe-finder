@@ -2,7 +2,7 @@
 
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
-> **Status: M5 (auth and favorites) implemented and verified offline. Live sign-in awaits your Supabase project** (see [docs/deployment.md](docs/deployment.md#supabase-setup-m5)). Guests can search, view the map and read details without an account. Signed-in users can save favorites with notes, mark visits and save search defaults, protected by Postgres Row Level Security. Without Supabase the site runs in guest-only mode. See [docs/milestones.md](docs/milestones.md).
+> **Status: M6 (community amenities) complete.** Guests can search, view the map, read details and read member reports without an account. Signed-in members can save favorites, mark visits and save search defaults. They can also report Wi-Fi, outlets, noise, seating and laptop-friendliness, write reviews, vote and flag. Approved member reports feed the ranking as separately labelled evidence, never mixed with Google data. Everything is protected by Postgres Row Level Security, limits and basic moderation. Without Supabase, the site runs in guest-only mode. See [docs/milestones.md](docs/milestones.md).
 
 ## Stack
 
@@ -101,7 +101,7 @@ Folders for later milestones (`lib/supabase/`, `supabase/` and others) are creat
 - Rate limits are in memory, per server instance. Google Cloud quotas are the hard ceiling.
 - The map needs a browser key. Without one, a "Map not available" panel is shown and everything else works.
 - Details pages cost one Place Details call (Enterprise + Atmosphere) per view, plus one Place Photo call per photo shown. Only the first photo loads automatically.
-- Atmosphere, Wi-Fi and quietness have no data source until community reports (M6). They count as neutral and are shown as "not verified". The scoring weights are initial hypotheses, not yet calibrated.
-- Budget, Wi-Fi, quietness and purpose fit can't be verified yet. They are shown as "not verified" and never filter results.
+- Wi-Fi, quietness and work/relax fit come only from member reports (M6). Most cafes have none yet, so these count as neutral and are shown as "not verified". Friends and date fit have no source. The scoring weights are initial hypotheses, not yet calibrated.
+- Budget and member-reported preferences never filter results. They only affect ranking.
 - Manual location means choosing one of the approximate Phnom Penh areas. There is no address search or map yet (M4).
 - Dark mode tokens exist, but nothing applies them yet. Privacy and terms pages are planned before production (M8).

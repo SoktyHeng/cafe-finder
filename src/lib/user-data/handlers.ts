@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logEvent } from "@/lib/observability/log";
 import { apiError } from "@/lib/security/api-error";
+import { MUTATING_METHODS, isSameOrigin, noContent, privateJson, readJson } from "@/lib/http/route-helpers";
 import { FixedWindowRateLimiter } from "@/lib/security/rate-limit";
 
 import {
@@ -17,7 +18,6 @@ import { UserDataError, type UserDataStore } from "./store";
 
 export const USER_DATA_RATE_LIMIT_PER_MINUTE = 60;
 const accountDeletionSchema = z.strictObject({ confirm: z.literal(ACCOUNT_DELETION_CONFIRMATION) });
-const MAX_BODY_BYTES = 4_096;
 
 export type UserContext = { userId: string; store: UserDataStore };
 
@@ -29,49 +29,6 @@ export type UserDataDeps = {
 
 type Authorized = { ok: true; context: UserContext } | { ok: false; response: Response };
 
-const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-/**
- * Cookie-authenticated mutations must come from our own pages. Browsers
- * always send `Origin` on cross-origin and on non-GET same-origin fetches,
- * so a missing or foreign Origin is rejected (CSRF protection).
- */
-export function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  if (request.headers.get("sec-fetch-site") === "cross-site") return false;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
-
-async function readJson<S extends z.ZodType>(
-  request: Request,
-  schema: S,
-): Promise<{ ok: true; value: z.infer<S> } | { ok: false; response: Response }> {
-  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
-    return { ok: false, response: apiError("VALIDATION_ERROR", "Expected a JSON request body.") };
-  }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
-    return { ok: false, response: apiError("VALIDATION_ERROR", "Request body is too large.") };
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return { ok: false, response: apiError("VALIDATION_ERROR", "Request body is not valid JSON.") };
-  }
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) {
-    const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".") || "body"))];
-    return { ok: false, response: apiError("VALIDATION_ERROR", `Invalid fields: ${fields.join(", ")}.`) };
-  }
-  return { ok: true, value: parsed.data };
-}
-
 function queryPlaceId(request: Request): { ok: true; value: string } | { ok: false; response: Response } {
   const parsed = placeIdSchema.safeParse(new URL(request.url).searchParams.get("placeId"));
   return parsed.success
@@ -79,9 +36,7 @@ function queryPlaceId(request: Request): { ok: true; value: string } | { ok: fal
     : { ok: false, response: apiError("VALIDATION_ERROR", "Invalid fields: placeId.") };
 }
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
-const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "private, no-store" } });
+const json = privateJson;
 
 function mapError(error: unknown, operation: string): Response {
   if (error instanceof UserDataError) {
@@ -102,7 +57,7 @@ export function createUserDataHandlers({
   limiter = new FixedWindowRateLimiter({ limit: USER_DATA_RATE_LIMIT_PER_MINUTE, windowMs: 60_000 }),
 }: UserDataDeps) {
   async function authorize(request: Request): Promise<Authorized> {
-    if (MUTATING.has(request.method) && !isSameOrigin(request)) {
+    if (MUTATING_METHODS.has(request.method) && !isSameOrigin(request)) {
       return { ok: false, response: apiError("FORBIDDEN", "Cross-site requests are not allowed.") };
     }
     let context: Awaited<ReturnType<typeof getContext>>;
@@ -205,3 +160,6 @@ export function createUserDataHandlers({
     },
   };
 }
+
+/** Re-exported for existing imports and tests. */
+export { isSameOrigin };

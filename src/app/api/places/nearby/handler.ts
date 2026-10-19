@@ -13,7 +13,10 @@ import {
   dedupeByPlaceId,
   withDistance,
 } from "@/lib/recommendation/filters";
+import type { CafeEvidence } from "@/lib/recommendation/factors";
 import { rankCafes } from "@/lib/recommendation/score";
+import { toCafeEvidence } from "@/lib/community/aggregate";
+import type { AmenitySummary } from "@/lib/community/schemas";
 import { UPSTREAM_UNAVAILABLE_MESSAGE, apiError } from "@/lib/security/api-error";
 import type { RequestGuard } from "@/lib/security/request-guard";
 
@@ -32,6 +35,11 @@ export type NearbyHandlerDeps = {
   guard: (env: NearbyEnv) => RequestGuard;
   /** Ranking weights and thresholds (defaults in lib/recommendation/config.ts). */
   scoringConfig?: ScoringConfig;
+  /**
+   * Approved member reports per place (M6). Must never throw or stall
+   * search; returns an empty map when unavailable.
+   */
+  getCommunity?: (placeIds: string[], now: Date) => Promise<Map<string, AmenitySummary[]>>;
   now?: () => Date;
 };
 
@@ -59,6 +67,7 @@ export function createNearbySearchHandler({
   getProvider,
   guard,
   scoringConfig = DEFAULT_SCORING_CONFIG,
+  getCommunity = async () => new Map(),
   now = () => new Date(),
 }: NearbyHandlerDeps) {
   return async function handleNearbySearch(request: Request): Promise<Response> {
@@ -105,9 +114,23 @@ export function createNearbySearchHandler({
       });
       const { kept, excluded } = applyHardFilters(dedupeByPlaceId(places), discovery);
 
+      const searchedAt = now();
+      const community = await getCommunity(kept.map((cafe) => cafe.placeId), searchedAt).catch(
+        () => new Map<string, AmenitySummary[]>(),
+      );
+      const evidenceByPlaceId = new Map<string, CafeEvidence>();
+      for (const [placeId, summaries] of community) {
+        const evidence = toCafeEvidence(summaries);
+        if (evidence) evidenceByPlaceId.set(placeId, evidence);
+      }
+      const ranked = rankCafes(withDistance(kept, origin), discovery, { config: scoringConfig, evidenceByPlaceId });
+
       const response: NearbySearchResponse = {
-        results: rankCafes(withDistance(kept, origin), discovery, { config: scoringConfig }),
-        searchedAt: now().toISOString(),
+        results: ranked.map((recommendation) => {
+          const summaries = community.get(recommendation.cafe.placeId);
+          return summaries && summaries.length > 0 ? { ...recommendation, community: summaries } : recommendation;
+        }),
+        searchedAt: searchedAt.toISOString(),
         source: provider.source,
         coverageNote: COVERAGE_NOTE,
         excluded,

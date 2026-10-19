@@ -69,3 +69,42 @@ test.describe("user-data API without a session", () => {
     await expect(page).toHaveURL(/\/login\?error=confirm$/);
   });
 });
+
+test.describe("community features in guest-only mode (M6)", () => {
+  test("details pages explain member reports aren't available and make no community request", async ({ page }) => {
+    const communityRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/community/")) communityRequests.push(request.url());
+    });
+    await page.goto("/cafes/fixture-001");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("region", { name: "From Cafe Finder members" })).toBeVisible();
+    await expect(page.getByTestId("community-unavailable")).toBeVisible();
+    expect(communityRequests).toEqual([]);
+  });
+
+  test("community guidelines are public, linked from the footer, and accessible", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("contentinfo").getByRole("link", { name: "Community guidelines" }).click();
+    await expect(page).toHaveURL(/\/community-guidelines$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Community guidelines" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Privacy" })).toBeVisible();
+    const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    expect(violations.map((violation) => violation.id)).toEqual([]);
+  });
+
+  test("moderation explains accounts aren't available", async ({ page }) => {
+    await page.goto("/moderation");
+    await expect(page.getByTestId("auth-unavailable")).toBeVisible();
+  });
+
+  test("community API reports unavailable and refuses cross-site writes", async ({ request }) => {
+    expect((await request.get("/api/community/fixture-001")).status()).toBe(503);
+    const write = await request.fetch("/api/community/fixture-001/review", {
+      method: "PUT",
+      headers: { Origin: "https://evil.example", "Content-Type": "application/json" },
+      data: { rating: 5, body: "A perfectly fine review text here." },
+    });
+    expect(write.status()).toBe(403);
+  });
+});

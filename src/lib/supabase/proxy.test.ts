@@ -55,6 +55,7 @@ describe("isProtectedPath", () => {
     ["/accounts", false],
     ["/discover", false],
     ["/", false],
+    ["/moderation", true],
   ])("%s -> %s", (path, expected) => {
     expect(isProtectedPath(path)).toBe(expected);
   });

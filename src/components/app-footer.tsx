@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { PlacesProviderName } from "@/lib/config/env-schema";
 
 type AppFooterProps = {
@@ -15,7 +17,12 @@ export function AppFooter({ placesProvider }: AppFooterProps) {
             Maps results.
           </p>
         )}
-        <p>Cafe Finder · Starting in Phnom Penh, Cambodia.</p>
+        <p>
+          Cafe Finder · Starting in Phnom Penh, Cambodia ·{" "}
+          <Link href="/community-guidelines" className="underline underline-offset-2">
+            Community guidelines
+          </Link>
+        </p>
       </div>
     </footer>
   );

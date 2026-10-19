@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { amenitySummarySchema } from "@/lib/community/schemas";
 import { cafePlaceSchema } from "@/lib/places/schemas";
 
 import { FACTORS } from "./config";
@@ -34,6 +35,11 @@ export const recommendationSchema = z.strictObject({
   cautions: z.array(z.string()),
   /** Requested preferences no data source could confirm for this cafe. */
   unverifiedPreferences: z.array(z.string()),
+  /**
+   * Approved Cafe Finder member reports (first-party), kept apart from
+   * `cafe` (Google/fixture data). Insufficient ones are shown but don't rank.
+   */
+  community: z.array(amenitySummarySchema).optional(),
 });
 
 export type Recommendation = z.infer<typeof recommendationSchema>;

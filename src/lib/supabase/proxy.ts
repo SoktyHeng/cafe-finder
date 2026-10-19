@@ -8,7 +8,7 @@ import { loginPath } from "@/lib/security/safe-redirect";
 import type { Database } from "./database.types";
 
 /** Pages that need a signed-in user. Pages and APIs re-check on the server. */
-export const PROTECTED_PATH_PREFIXES = ["/favorites", "/account"] as const;
+export const PROTECTED_PATH_PREFIXES = ["/favorites", "/account", "/moderation"] as const;
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

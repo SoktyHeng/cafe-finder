@@ -57,7 +57,7 @@ coverage = Σ wᵢ(known) / Σ wᵢ    (applicable factors only)
 ```
 
 - Unknown data is **neither rewarded nor penalized**: it sits at the midpoint. A cafe with an unknown rating is treated like a typical cafe rather than a bad or perfect one.
-- Because atmosphere is always unknown today, **no cafe can reach 100%**. Any requested preference that can't be checked caps the score. This is intended, because the match is genuinely uncertain.
+- Without member reports, atmosphere is unknown, so **no cafe can reach 100%**. Any requested preference that can't be checked caps the score. This is intended, because the match is genuinely uncertain.
 - Unverifiable preferences such as Wi-Fi, quiet and atmosphere appear on every card as "Not verified for this cafe". They never appear as reasons.
 
 ## Confidence and the percentage
@@ -82,9 +82,44 @@ The card also shows a breakdown table ("How this match is calculated") with each
 
 An invariant test generates 2,000 random cafes across 3 requests and checks that scores are finite and schema-valid, that no reason cites a field the cafe lacks, and that Wi-Fi, quiet and atmosphere are never claimed.
 
-## Evidence beyond Google (future)
+## Community evidence (M6)
 
-`scoreCafe` accepts optional `CafeEvidence` (`purposeFit`, `wifi`, `quiet`, `sourceLabel`) and `rankCafes` accepts `evidenceByPlaceId`. Nothing supplies it yet. M6 community reports will, and their reasons will name the source, for example "Wi-Fi reported (community reports)".
+`scoreCafe` accepts optional `CafeEvidence`, and `rankCafes` accepts `evidenceByPlaceId`. The nearby handler builds it from **approved** member reports ([lib/community/aggregate.ts](../src/lib/community/aggregate.ts)). Google data never feeds it, and it never changes Google fields.
+
+```ts
+type EvidenceSignal = { score: number /* 0–1 */; detail: string /* "3 reports, 1 confirmed visit, latest Oct 2026" */ };
+type CafeEvidence = { sourceLabel: "Cafe Finder members"; purposeFit?: { work?: EvidenceSignal; relax?: EvidenceSignal }; wifi?: EvidenceSignal; quiet?: EvidenceSignal };
+```
+
+**Trust model** (`COMMUNITY_TRUST`):
+- Each report weighs 1 if the reporter marked the place visited, and 0.5 otherwise.
+- Weight halves every 180 days of age, counted in whole days. Reports older than a year aren't read at all.
+- Per amenity, the **consensus** is the value with the most weight. Ties go to the first value in option order, so the result is deterministic.
+- The **score** is the weighted mean of the value scores:
+
+  | Amenity | Value scores |
+  |---|---|
+  | Wi-Fi, laptop-friendly | yes 1, no 0 |
+  | Outlets | many 1, some 0.6, none 0 |
+  | Noise | quiet 1, moderate 0.5, loud 0 |
+  | Seating | comfortable 1, ok 0.6, uncomfortable 0.1 |
+
+- A summary is **sufficient** only with a total weight of at least 1: one confirmed visit, or two unconfirmed reports. Only sufficient summaries become evidence or appear on cards.
+- It is **conflicted** when the consensus holds less than 60% of the weight. Conflicted summaries still count, through their middling score, but are shown as "mixed reports".
+
+**Mapping to factors:**
+- `wifi` comes from Wi-Fi reports. `quiet` comes from noise reports.
+- Purpose fit for **work** is the mean of laptop-friendly, outlets and Wi-Fi. For **relax**, it's the mean of noise and seating.
+- **Friends and date stay unknown.** No member question measures them.
+- These fill the atmosphere (15) and amenities (15) factors, which were always unknown before. They now raise coverage and can lift confidence.
+
+**Wording.** A score of 0.7 or more is a reason, 0.3 or less is a caution, and anything in between is "partly". Every phrase names the source and evidence:
+- "Wi-Fi reported (Cafe Finder members: 3 reports, 1 confirmed visit, latest Oct 2026)"
+- "Reported to have no Wi-Fi", "Not reliably quiet", "Partly suited to work"
+
+Without sufficient reports, the preference stays in "Not verified for this cafe".
+
+**Failure handling.** Community data is loaded with a 2-second timeout. If it fails, ranking proceeds exactly as before, on Google data alone.
 
 ## Empty-state relaxation
 

@@ -1,0 +1,48 @@
+﻿M6 browser QA report
+Date: 2026-10-19 (Asia/Phnom_Penh)
+Environment: existing Chrome session, http://localhost:3000, live Google cafe data, existing signed-in member account.
+Scope: docs/deployment.md M6 manual live checklist. User requested current account only; no account creation, role changes, or application fixes.
+Cafe: LA. CHRONIQUE
+Details URL: http://localhost:3000/cafes/ChIJId_HNd5QCTERT-Bx46uTi_4?from=area%3Dtuol-tom-poung%26purpose%3Drelax%26radius%3D3000
+
+RESULT: M6 checklist cannot pass in this environment. Two submission failures observed; they may share a root cause. Root cause is unconfirmed.
+
+BUG 1 - High: signed-in member cannot submit an amenity report.
+Steps: open the cafe details; in Report what you found select Wi-Fi Available; leave other amenities unselected; use visit date 2026-10-19; click Submit report.
+Expected: report saves, confirmation appears, and own contribution remains after refresh. Public aggregate may still be unknown until enough reports exist.
+Actual: inline error: That action isn't allowed on this item.
+Reproduced after a full reload. Own report was not prefilled after reload; summary still showed no member reports.
+Evidence: 05-wifi-error-reproduced.jpg; full-page context in 01-submission-errors.jpg.
+
+BUG 2 - High: signed-in member cannot post a valid review.
+Steps: choose 4 out of 5; enter the 82-character text below; click Post review.
+Text: M6 browser QA test review. Synthetic test content; not a real customer experience.
+Expected: review saves and appears as member content.
+Actual: inline error: That action isn't allowed on this item. Member reviews stays at 0; after reload no own review was populated.
+Evidence: 02-review-error.jpg; full-page context in 01-submission-errors.jpg.
+
+PHONE-NUMBER PATH - Blocked by same submission failure.
+Input: M6 browser QA test only. Synthetic contact number: +1 202-555-0123. This is not a real customer experience.
+Rating: 4 out of 5.
+Expected: moderator-check confirmation; review withheld from other members.
+Actual: same action-not-allowed error. No moderation confirmation. Other-member visibility could not be tested.
+Evidence: 03-phone-review-error.jpg.
+
+CHECKLIST COVERAGE
+1. Account A Wi-Fi report and normal review: FAIL (bugs above).
+2. Phone-number review held for moderation: BLOCKED by failed submission; cross-account visibility not tested.
+3. Account B helpful vote, flag, and own-review control suppression: BLOCKED (no second account and no successfully created review).
+4. Moderator approve and subsequent visibility: BLOCKED (current account is not a moderator and no held review was created). Direct /moderation correctly displayed This page is only available to moderators. Evidence: 04-moderation-access.jpg. This message is expected access control, not a bug.
+5. Discovery card shows separately labelled two-member evidence: BLOCKED (could not create reports; no second account).
+
+ADDITIONAL OBSERVATIONS
+- Details loaded live Google facts and reviews.
+- Member section clearly states content is from members, not Google, and is visually separate from Google sections.
+- Empty amenities display unknown / No member reports yet.
+- Community guidelines page loads directly and documents moderation and privacy.
+- Captured browser error/warning logs returned no entries; this does not establish that no server errors occurred.
+- Frontend source maps FORBIDDEN to the observed text. Both CSRF rejection and store permission failures can reach that code, so screenshots alone do not establish the underlying cause.
+- No successful content creation was observed. Application code, database schema, permissions, and account settings were not changed.
+
+NEXT VALIDATION NEEDED
+Investigate the rejected community writes in the running environment, then rerun all five checklist steps with two member accounts and a moderator.
