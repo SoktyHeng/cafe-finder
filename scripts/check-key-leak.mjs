@@ -6,6 +6,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const CANARIES = {
+  OPENAI_API_KEY: "canary-openai-key-41fbd8",
+  NVIDIA_API_KEY: "canary-nvidia-key-271d8a",
   GOOGLE_PLACES_SERVER_API_KEY: "canary-places-key-7f3a9c",
   GOOGLE_ROUTES_SERVER_API_KEY: "canary-routes-key-2b8e1d",
   SUPABASE_SERVICE_ROLE_KEY: "canary-service-role-5c4f0a",
@@ -16,7 +18,7 @@ const SKIP_DIRS = new Set(["cache", "dev"]);
 const build = spawnSync("pnpm build", {
   stdio: "inherit",
   shell: true,
-  env: { ...process.env, PLACES_PROVIDER: "google", ...CANARIES },
+  env: { ...process.env, PLACES_PROVIDER: "google", ENABLE_AI: "true", AI_PROVIDER: "openai", ...CANARIES },
 });
 if (build.status !== 0) {
   console.error("Build failed; key leak check not completed.");

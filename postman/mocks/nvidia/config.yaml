@@ -1,0 +1,7 @@
+version: 1
+name: NVIDIA NIM Chat Completions contract
+description: Synthetic hosted GPT-OSS intent parsing subset; no real keys or user data.
+interceptRequests: true
+scenarios:
+  - name: default
+    path: default.js

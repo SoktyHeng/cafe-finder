@@ -37,7 +37,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  const { PLACES_PROVIDER } = getServerEnv();
+  const { PLACES_PROVIDER, ENABLE_AI } = getServerEnv();
 
   return (
     <html lang="en" className={`${geistSans.variable} ${roboto.variable} h-full antialiased`}>
@@ -50,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </a>
         <AuthProvider>
           <SavedPlacesProvider>
-            <AppHeader />
+            <AppHeader enableAI={ENABLE_AI} />
             <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">
               {children}
             </main>

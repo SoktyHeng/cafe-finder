@@ -1,5 +1,39 @@
 # Deployment and operations
 
+## Optional AI search (M7)
+
+Off by default: `ENABLE_AI=false`. To enable, set `ENABLE_AI=true`, `AI_PROVIDER=openai`, and `OPENAI_API_KEY` in server secrets, then rebuild/restart. The model identifier is fixed to `gpt-5.6-luna` in `lib/ai/openai-provider.ts`; a model change requires price/cap review and the live acceptance evaluation. Never use a `NEXT_PUBLIC_` AI key. `assertSeparateGoogleKeys` also rejects an OpenAI key accidentally configured in one of the supported browser-key fields.
+
+The OpenAI provider calls `api.openai.com` and requires an OpenAI project API key. NVIDIA (`nvapi-…`) and Azure/Foundry credentials cannot authenticate to that endpoint. The evaluation command rejects NVIDIA-format credentials when OpenAI is selected. It reads AI settings from the shell, `.env.local`, then `.env`. Keep those files ignored; never paste credentials into chat or commit them.
+
+### NVIDIA NIM
+
+Set `ENABLE_AI=true`, `AI_PROVIDER=nvidia` and `NVIDIA_API_KEY` to use `openai/gpt-oss-20b` at the fixed server endpoint `https://integrate.api.nvidia.com/v1/chat/completions`. For existing local setups only, a legacy `OPENAI_API_KEY` value beginning `nvapi-` is accepted when NVIDIA is selected; prefer moving it to `NVIDIA_API_KEY`. Neither endpoint nor model can be set by a browser request. OpenAI-hosted access remains a separate provider with separate credentials.
+
+The NVIDIA adapter uses strict JSON Schema, non-streamed responses, low reasoning effort, at most 2,048 completion tokens, a 30-second timeout, and no automatic retries. Reasoning text is never exposed or logged. It returns only validated filter fields, and rejects tool calls, refusals, truncation and malformed output. The UI names NVIDIA in the disclosure when selected.
+
+`AI_DAILY_REQUEST_LIMIT=50` caps NVIDIA attempts per process per 24-hour window starting at the first attempt; failures count. Existing client/global AI limits also apply. Logs record provider/model, status, latency and input/output tokens. NVIDIA's hosted endpoint is offered for prototyping; quota/credits and any commercial pricing are controlled by your NVIDIA account. We do not assign invented dollar prices to its usage: request/token caps bound volume, while NVIDIA account quotas remain the billing boundary. The OpenAI micro-USD reservation below applies only to the OpenAI provider. All process-local limits reset on restart and multiply across replicas.
+
+Official NVIDIA references: [GPT-OSS endpoint](https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-20b-infer), [hosted model and key setup](https://build.nvidia.com/openai/gpt-oss-20b). The app sends search text/history and preference values to the selected provider, not selected coordinates or Google cafe data.
+
+Offline: `ENABLE_AI=true AI_PROVIDER=fixture PLACES_PROVIDER=fixture` (set these as individual environment variables). Scripted examples live in `lib/ai/fixture-provider.ts`. Other messages ask for clarification. The app labels both the scripted parser and fictional cafe data; combining the scripted parser with live Google Places is rejected.
+
+Controls:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AI_RATE_LIMIT_PER_MINUTE` | 5 | Per hashed client, 1–60 |
+| `AI_GLOBAL_RATE_LIMIT_PER_MINUTE` | 30 | Whole process, 1–1,000 |
+| `AI_DAILY_BUDGET_MICRO_USD` | 1,000,000 | $1 per UTC day per process; each attempted OpenAI call reserves $0.02 with no refund |
+
+The daily reservation is synchronous, so simultaneous calls cannot overspend the in-process allowance. At most 50 attempts/day at the default budget. Failed calls also consume a reservation. Input, including instructions/schema, is capped at 20,000 UTF-8 bytes and output at 512 tokens. With the reviewed standard rates ($0.20/M input, $1.20/M output tokens), the $0.02 reservation exceeds a worst-case request; cached-token discounts are ignored, and estimates use a 25% input-price buffer for possible cache writes. The model page lists an alias only, so provider changes require reevaluation. Limits reset at UTC midnight or process restart, and **multiply across instances**. They are not an account-wide billing guarantee. Set OpenAI project restrictions, spend alerts and appropriate quotas; a durable shared budget would require additional infrastructure outside this M7 process-local design. Do not scale replicas while assuming a $1 account-wide cap.
+
+Observe `ai_call` logs (model, outcome, duration) and `ai_usage` (input/output token counts, conservative estimated micro USD, cumulative reserved micro USD). No raw prompts, coordinates, account IDs, cafe data, vendor payloads or credentials are logged. Reserve failures return a safe 429; network, timeout, refusal, malformed/incomplete output and vendor 4xx/5xx fail safely without retries. The UI preserves settings and links to normal discovery.
+
+Kill switch: set `ENABLE_AI=false`, rebuild/restart. Ordinary search does not depend on AI. For a live interpreter check, run `pnpm test:ai:live` (12 billable parser calls, no Places calls). Then run the manual flow: first search in BKK1; refine radius/open-now; remove a preference; try near-me with location denied; verify unsupported locations ask for clarification; compare card reasons to their underlying facts. Test the selected AI provider + live Google only when both credentials are configured. Do not label mock or scripted runs as live AI verification.
+
+Official references reviewed 2026-10-19: [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [model and pricing](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [Google Places policy](https://developers.google.com/maps/documentation/places/web-service/policies). `store:false` disables stored Responses state; it is not a claim of zero provider retention. Search text typed by the user can still contain personal information; the UI tells users what is sent and discourages sensitive details.
+
 This covers the M2 scope: Google Places configuration. The production checklist is completed in M8.
 
 ## Google Cloud setup

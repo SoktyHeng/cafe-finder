@@ -22,6 +22,20 @@ function expectEnvError(fn: () => unknown): EnvValidationError {
 }
 
 describe("parseServerEnv", () => {
+  it("accepts NVIDIA with its own key or the existing nvapi credential, and requires one when enabled", () => {
+    expect(parseServerEnv({ ENABLE_AI: "true", AI_PROVIDER: "nvidia", NVIDIA_API_KEY: "nvapi-test" }).AI_PROVIDER).toBe("nvidia");
+    expect(parseServerEnv({ ENABLE_AI: "true", AI_PROVIDER: "nvidia", OPENAI_API_KEY: "nvapi-legacy" }).AI_PROVIDER).toBe("nvidia");
+    expect(() => parseServerEnv({ ENABLE_AI: "true", AI_PROVIDER: "nvidia" })).toThrow(EnvValidationError);
+    expect(() => parseServerEnv({ AI_PROVIDER: "unknown" })).toThrow(EnvValidationError);
+  });
+  it("requires a private key only for enabled OpenAI; fixtures cannot mix with live Places", () => {
+    expect(() => parseServerEnv({ ENABLE_AI: "true" })).toThrow(EnvValidationError);
+    expect(parseServerEnv({ ENABLE_AI: "true", OPENAI_API_KEY: "test-only" }).ENABLE_AI).toBe(true);
+    expect(parseServerEnv({ ENABLE_AI: "true", AI_PROVIDER: "fixture" }).OPENAI_API_KEY).toBeUndefined();
+    expect(() => parseServerEnv({ ENABLE_AI: "true", AI_PROVIDER: "fixture", PLACES_PROVIDER: "google", GOOGLE_PLACES_SERVER_API_KEY: "test" })).toThrow(EnvValidationError);
+    expect(() => parseServerEnv({ AI_DAILY_BUDGET_MICRO_USD: "-1" })).toThrow(EnvValidationError);
+    expect(() => parseServerEnv({ AI_RATE_LIMIT_PER_MINUTE: "61" })).toThrow(EnvValidationError);
+  });
   it("defaults to fixture mode with no keys configured", () => {
     expect(parseServerEnv({})).toEqual({
       NODE_ENV: "development",
@@ -30,6 +44,13 @@ describe("parseServerEnv", () => {
       GOOGLE_ROUTES_SERVER_API_KEY: undefined,
       SUPABASE_SERVICE_ROLE_KEY: undefined,
       ENABLE_AI: false,
+      OPENAI_API_KEY: undefined,
+      NVIDIA_API_KEY: undefined,
+      AI_PROVIDER: "openai",
+      AI_DAILY_REQUEST_LIMIT: 50,
+      AI_RATE_LIMIT_PER_MINUTE: 5,
+      AI_GLOBAL_RATE_LIMIT_PER_MINUTE: 30,
+      AI_DAILY_BUDGET_MICRO_USD: 1_000_000,
       ENABLE_COMMUNITY_REPORTS: false,
       MAX_SEARCH_RADIUS_METERS: 15_000,
       DISCOVERY_RATE_LIMIT_PER_MINUTE: 10,
@@ -129,7 +150,7 @@ describe("parseServerEnv", () => {
   });
 
   it("parses boolean flags strictly", () => {
-    expect(parseServerEnv({ ENABLE_AI: "true" }).ENABLE_AI).toBe(true);
+    expect(parseServerEnv({ ENABLE_AI: "true", OPENAI_API_KEY: "test-only" }).ENABLE_AI).toBe(true);
     expect(parseServerEnv({ ENABLE_AI: "false" }).ENABLE_AI).toBe(false);
     expectEnvError(() => parseServerEnv({ ENABLE_AI: "yes" }));
     expectEnvError(() => parseServerEnv({ ENABLE_COMMUNITY_REPORTS: "1" }));
@@ -201,6 +222,14 @@ describe("Map ID", () => {
 });
 
 describe("assertSeparateGoogleKeys", () => {
+  it("refuses the OpenAI key in every supported browser key setting without exposing it", () => {
+    const privateKey = "private-ai-canary";
+    for (const name of ["NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
+      const publicEnv = parsePublicEnv({ [name]: privateKey });
+      const error = expectEnvError(() => assertSeparateGoogleKeys({ ...parseServerEnv({}), OPENAI_API_KEY: privateKey }, publicEnv));
+      expect(error.message).not.toContain(privateKey);
+    }
+  });
   const server = {
     GOOGLE_PLACES_SERVER_API_KEY: "server-key-abc",
     GOOGLE_ROUTES_SERVER_API_KEY: undefined,

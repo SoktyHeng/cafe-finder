@@ -1,5 +1,13 @@
 # Cafe Finder
 
+M7 adds an optional conversational search assistant at `/assistant`. It is **off by default**. The configured AI provider parses preferences only; the existing Places provider, approved community evidence, and deterministic recommendation engine supply all cafe facts and match explanations. See the M7 entry in [milestones](docs/milestones.md) for verification status; M8 has not started.
+
+To try the scripted offline demo, set `ENABLE_AI=true`, `AI_PROVIDER=fixture`, and `PLACES_PROVIDER=fixture`, then rebuild/restart. Try “Find a quiet cafe with Wi-Fi under $5 in BKK1.” followed by “Only open now, within 2 km.” This mode is labelled as a scripted demo and does not call OpenAI.
+
+For real language interpretation, use `AI_PROVIDER=openai` and set `OPENAI_API_KEY` in ignored `.env.local`. Keep `PLACES_PROVIDER=fixture` for fictional cafe results, or use your configured `google` provider for live Places results. The key remains server-side. Read [deployment](docs/deployment.md#optional-ai-search-m7) before enabling.
+
+NVIDIA-hosted GPT-OSS is also supported: set `ENABLE_AI=true`, `AI_PROVIDER=nvidia`, and `NVIDIA_API_KEY` in an ignored env file. The fixed model is `openai/gpt-oss-20b` on NVIDIA NIM. Your selected coordinates and cafe records are not sent to either AI provider. `pnpm test:ai:live` evaluates whichever live provider is selected.
+
 Personalized, location-aware cafe discovery. Initial market: Phnom Penh, Cambodia.
 
 > **Status: M6 (community amenities) complete.** Guests can search, view the map, read details and read member reports without an account. Signed-in members can save favorites, mark visits and save search defaults. They can also report Wi-Fi, outlets, noise, seating and laptop-friendliness, write reviews, vote and flag. Approved member reports feed the ranking as separately labelled evidence, never mixed with Google data. Everything is protected by Postgres Row Level Security, limits and basic moderation. Without Supabase, the site runs in guest-only mode. See [docs/milestones.md](docs/milestones.md).

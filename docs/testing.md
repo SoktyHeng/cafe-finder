@@ -1,5 +1,18 @@
 # Testing
 
+## Optional assistant (M7)
+
+- Default `pnpm test`: intent validation/merge/location/privacy, daily budget reservation, Responses HTTP envelope/error/refusal/timeout behavior, handler orchestration through actual fixture Places/ranking, saved-preference isolation, and conversational component success/failure/duplicate-submit checks.
+- `pnpm test:e2e`: AI disabled-mode fallback alongside M0–M6 regressions.
+- `pnpm test:e2e:ai`: separate production build with `ENABLE_AI=true AI_PROVIDER=fixture`; desktop and Pixel 7 flows for search, conversational refinement, grounding/unknowns, details links, missing-location clarification, regular fallback, overflow and axe accessibility checks. This verifies orchestration/UI, not live model interpretation.
+- Real-HTTP contract simulation: run `postman simulation run postman/simulations/assistant.sim.yaml --port 4900 --no-history --output ndjson`, then set `AI_SIMULATION_URL=http://127.0.0.1:4900` and run `pnpm exec vitest run src/lib/ai/simulation.test.ts`. Twelve tests run both production clients against real HTTP success, 429, HTML 502, invalid JSON, hanging and unreachable dependencies, plus the complete handler→parser→Places→ranking path. No live credentials or venues are used. Stop the simulation when finished. Logs may contain synthetic test requests; do not commit run logs. An owning-team mock lookup was skipped because Postman was signed out; this local mock implements only the documented Responses/Chat Completions subsets we consume, and returns 501 elsewhere.
+- `pnpm test:ai:live`: opt-in live acceptance corpus of 12 cases for the selected live provider. An initial connectivity/auth failure aborts before repeated requests; otherwise all semantic cases run. Reads the key from the shell, ignored `.env.local`, or ignored `.env` in that order; never prints the key/raw response. Checks sample intent, synonyms, filters, follow-ups, unsupported places, range clarification and adversarial inputs. Requires the matching OpenAI or NVIDIA key and incurs provider usage; it never calls Google. Default tests skip this corpus and the HTTP simulation.
+- `pnpm check:secrets`: includes OpenAI and NVIDIA canaries alongside existing server-secret canaries.
+
+Final NVIDIA verification (2026-10-19): 692 offline tests passed (24 opt-in skips), 99 default E2E passed (9 skips), 6 enabled E2E passed (2 skips), 12 HTTP simulation cases passed, and 12 live NVIDIA cases passed. The AI-enabled secret-canary build scanned 739 files with no leaked OpenAI, NVIDIA or other server canaries. Live Chrome testing also verified NVIDIA plus actual Google Places and a conversational follow-up.
+
+The AI and normal E2E configurations share `.next`; run them sequentially. Live model output and live Google integration must be reported separately from deterministic/scripted verification. Test data from the earlier M6 browser review is independent; its international-phone moderation gap is not changed by M7.
+
 ## Layers
 
 | Layer | Tool | Location | Command |

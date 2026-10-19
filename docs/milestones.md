@@ -9,8 +9,42 @@
 | M4 — Maps and cafe details | ✅ Complete, including live map verification (2026-10-16) |
 | M5 — Auth and favorites | ✅ Implemented and verified offline (2026-10-16). Live sign-in awaits a Supabase project |
 | M6 — Original community amenities | ✅ Complete, including live database verification (2026-10-19). Upsert permission fix applied the same day |
-| M7 — Optional natural-language discovery | Not started |
+| M7 — Optional natural-language discovery | Complete with NVIDIA, including live interpretation and Google Places browser verification (2026-10-19) |
 | M8 — Production readiness and launch | Not started |
+
+## M7 - Optional natural-language discovery
+
+### Delivered
+
+- Reviewed CLAUDE.md and M0-M6 architecture, contracts, auth/preferences, providers, guards, community evidence, ranking and tests. Reused existing boundaries without database changes or M8 work.
+- Added optional /assistant and POST /api/assistant, page-memory conversation, verified saved defaults, strict preference patches, explicit resets, supported-location clarification, safe errors and regular-search fallback.
+- Server-only OpenAI Responses and NVIDIA NIM adapters share a strict intent contract. The user authorized NVIDIA with the existing key; local configuration now uses AI_PROVIDER=nvidia and NVIDIA_API_KEY. The fixed NVIDIA model is openai/gpt-oss-20b.
+- No tools or generated venue prose. Models receive search text/history and categorical preferences, never selected coordinates, account identifiers or cafe records. Existing Places providers, approved community evidence and deterministic ranking supply every cafe and explanation.
+- Both adapters bound input/output, use timeouts and avoid automatic retries. NVIDIA attempts have a daily process-local cap; OpenAI has conservative daily cost reservations. Client/global AI guards and downstream Places guards apply. Limits reset on restart and multiply across replicas.
+- Committed defaults remain ENABLE_AI=false, AI_PROVIDER=openai. The explicitly labelled scripted fixture parser requires fixture Places.
+
+### Acceptance evidence
+
+| Criterion | Verification |
+|---|---|
+| Supported intent maps to structured filters | Twelve live NVIDIA cases pass, covering the sample, synonyms, purposes, areas, radii, ratings and opening status |
+| Conversational and personalized | Follow-ups preserve and explicitly reset settings; verified saved defaults covered by unit, handler and component tests |
+| Grounded recommendations and explanations | Live browser results contain actual Google cafes; cards identify unverified amenities and advisory budgets; model output cannot supply cafes or scores |
+| Adversarial input and safe errors | Live adversarial cases pass; strict schemas, no tools/secrets in instructions, bounded bodies, same-origin checks, downstream guards; refusal/quota/timeout/malformed errors tested |
+| Usage controls | Provider-specific attempt/token/cost bounds, secret-free logs and tested exhaustion/reset; process-local scope documented |
+| Optional feature and graceful fallback | Disabled page/endpoint/navigation, retained manual settings and recovery; desktop/mobile suites pass |
+
+### Verification (2026-10-19)
+
+- pnpm check: lint/typecheck and **692 tests passed, 24 opt-in live/simulation cases skipped**. Run heavy builds separately from unit tests.
+- pnpm test:e2e: **99 passed, 9 intentional configuration/viewport skips**.
+- pnpm test:e2e:ai: **6 passed, 2 disabled-mode skips**, covering desktop and Pixel 7 search/refinement, grounding, details, fallback, clarification, accessibility and overflow.
+- Real HTTP Postman simulation: **12 passed**, exercising both adapters, full interpretation-to-Places-to-ranking orchestration, quota/HTML/malformed/hanging/unreachable dependencies.
+- pnpm test:ai:live: **12/12 live NVIDIA cases passed**. Initial connectivity/auth failure aborts before repeated requests; semantic cases otherwise all run. This corpus does not call Google.
+- Chrome computer-use with NVIDIA and live Google: quiet/Wi-Fi/under-$5 in BKK1 returned 20 actual cafes. A 2 km/open-now follow-up retained quiet/Wi-Fi/budget. Both upstreams returned HTTP 200. Evidence: artifacts/m7-browser/04-nvidia-live-search.jpg and 05-nvidia-live-follow-up.jpg.
+- Production build and startup with AI_PROVIDER=nvidia passed. Secret-canary build verification is recorded in testing notes.
+
+M7 is complete for the authorized NVIDIA configuration. Direct OpenAI-hosted live interpretation remains unverified because no valid OpenAI credential was supplied; its adapter is covered offline and through real HTTP simulation. M8 has not started. The earlier M6 international-phone moderation gap and outstanding M5 multi-account checks remain independent known limitations.
 
 ## M6 — Original community amenities
 

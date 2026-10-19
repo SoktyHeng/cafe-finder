@@ -1,5 +1,7 @@
 # Google Maps Platform compliance
 
+M7's selected AI parser (OpenAI or NVIDIA) receives only user-authored search strings and preference values. Google venue fields, reviews, attributions, photos, names, addresses and coordinates are not sent to either AI provider. Google Places remains behind the existing provider and is fetched only after a valid, resolved intent. Ranking/explanations remain deterministic, attribution rendering is reused, and no Google catalogue or conversational venue cache is created. User-entered exact dollar budgets remain advisory and unknown amenities are not inferred from Google ratings.
+
 Last reviewed: **2026-10-16**, against the official pages listed at the end. Re-check them before changing field masks, adding caching, adding a map, or launching.
 
 ## APIs in use (M2–M4)

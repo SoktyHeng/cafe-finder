@@ -1,0 +1,7 @@
+simulation: cafe-assistant
+routing: path
+mocks:
+  - routeKey: openai
+    path: ../mocks/openai/config.yaml
+  - routeKey: nvidia
+    path: ../mocks/nvidia/config.yaml

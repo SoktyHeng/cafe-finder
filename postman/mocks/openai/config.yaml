@@ -1,0 +1,7 @@
+version: 1
+name: OpenAI Responses contract
+description: Local synthetic Responses API boundary for M7; never live model output.
+interceptRequests: true
+scenarios:
+  - name: default
+    path: default.js

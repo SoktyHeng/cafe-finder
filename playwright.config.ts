@@ -25,6 +25,7 @@ export default defineConfig({
     timeout: 240_000,
     env: {
       PLACES_PROVIDER: "fixture",
+      ENABLE_AI: "false",
       NEXT_PUBLIC_APP_URL: baseURL,
       // All tests share one client; production defaults would throttle the suite.
       DISCOVERY_RATE_LIMIT_PER_MINUTE: "10000",

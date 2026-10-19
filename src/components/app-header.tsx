@@ -3,10 +3,10 @@ import Link from "next/link";
 
 import { AuthNav } from "@/features/auth/components/auth-nav";
 
-export function AppHeader() {
+export function AppHeader({ enableAI = false }: { enableAI?: boolean }) {
   return (
     <header className="border-b bg-background/95">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 px-4 py-1 sm:px-6">
         <Link
           href="/"
           className="inline-flex min-h-11 items-center gap-2 rounded-md font-semibold tracking-tight focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
@@ -22,6 +22,7 @@ export function AppHeader() {
             Discover
           </Link>
           <AuthNav />
+          {enableAI && <Link href="/assistant" className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline">Assistant</Link>}
         </nav>
       </div>
     </header>

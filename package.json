@@ -11,6 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:ai": "playwright test --config playwright.ai.config.ts",
+    "test:ai:live": "node scripts/ai-live-eval.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "check:secrets": "node scripts/check-key-leak.mjs",
     "smoke:live": "node scripts/live-smoke.mjs"

@@ -1,5 +1,20 @@
 # API contracts
 
+## Conversational assistant (M7)
+
+`POST /api/assistant` accepts JSON from the same origin only. Body limit: **12,000 UTF-8 bytes**, enforced while streaming even without Content-Length. Strict input fields:
+
+- `message`: trimmed nonempty text, at most 1,000 characters.
+- `history`: up to six previous user search strings, each at most 1,000 characters. Arbitrary chat roles/system messages are not accepted.
+- `preferences` (optional): the existing strict M5 preferences contract. Omitted on the first turn to use verified saved defaults, otherwise explicit conversation draft values. No user ID is accepted.
+- `location`: `null`, `{kind:"area",areaId:<supported area ID>}`, or `{kind:"device",latitude,longitude}`. Device positions are rounded again on the server. The parser cannot supply coordinates.
+
+Example: `{"message":"Find a quiet cafe with Wi-Fi under $5 in BKK1.","history":[],"location":null}`.
+
+Success returns `{status,message,provider,preferences,location,locationLabel,filters,notices,results}`. `status` is `ready`, `clarify` or `unsupported`; `provider` is `openai`, `nvidia` or `fixture`. `filters` is the validated DiscoveryRequest or null; `results` is the existing NearbySearchResponse or null. The reply message and notices are application-owned text. Cafe data and match reasons are only from the downstream recommendation pipeline. “Clarify” and “unsupported” make no Places request.
+
+Errors use the existing error contract: 400 invalid/oversized input; 403 absent/foreign Origin; 429 client/global throttling or exhausted daily AI allowance (Retry-After); 503 disabled/unavailable/refused/invalid AI responses. Downstream Places failures and throttling retain their existing status/code. Responses are private/no-store; raw model responses, upstream errors and credentials never reach the client. Normal discovery remains available independently of AI.
+
 All routes return JSON. Errors always use the shape below and never include vendor payloads, keys, stack traces or submitted values.
 
 ```json

@@ -1,6 +1,20 @@
 # Architecture
 
-The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M6).
+## Optional conversational discovery (M7)
+
+The intent boundary supports OpenAI Responses, NVIDIA NIM Chat Completions (`openai/gpt-oss-20b`), and the scripted fixture adapter. Both live adapters use the shared instruction contract in `lib/ai/instructions.ts` and return the same strict `SearchIntent`. NVIDIA uses its own server-only credential and fixed endpoint, JSON Schema, 2,048-token cap, 30-second timeout and per-process daily attempt allowance. No reasoning text is displayed, no tools are executed, and the result/ranking pipeline is identical for every parser. The UI identifies the actual receiving provider.
+
+`/assistant` is a guest-accessible page behind the server `ENABLE_AI` flag. With the flag off, it explains how to use regular discovery and the navigation link is hidden. `features/assistant/search-assistant.tsx` retains at most six previous user turns in page memory; no conversation database or browser storage is used. It sends one request per explicit submit, preserves settings on failure, and offers `/discover` with the same structured settings.
+
+`POST /api/assistant` → same-origin check → client/global AI guard → bounded JSON input → verified saved preferences (first turn only, optional) → `IntentProvider` → strict output validation → pure `resolveIntent` → existing Nearby handler → existing Places guards/provider → approved community aggregation → deterministic ranking → existing result cards/map/details.
+
+`lib/ai/` separates the intent contract, OpenAI/NVIDIA adapters, scripted fixture adapter, pure merge/location resolution, per-process runtime and conservative budget reservation. Each live AI request contains only search text/history and categorical preferences, never selected coordinates, account identifiers, cafe records, Google reviews, or API keys in instructions. No model tools, arbitrary URLs, model-selected endpoints, generated venue descriptions, or generated scores exist. Secrets appear only in the server's authorization header. The model cannot grant access or bypass the downstream radius, schema, Places rate limits, or ranking rules.
+
+Personalization uses existing, verified M5 saved defaults; explicit current preferences override them. Follow-ups send the previous interpreted preferences as an editable draft. They confer no identity or database access. Cafe explanations remain the deterministic M3/M6 reasons with provenance and uncertainty. Unsupported locations require clarification; “near me” requires a separately supplied device location, obtained only through the existing permission button. Unknown Wi-Fi/quietness and exact dollar prices are never promised.
+
+The OpenAI adapter fixes the model identifier to `gpt-5.6-luna`, uses strict JSON Schema, reasoning effort `none`, `store:false`, a 10-second timeout, 512 output tokens and no automatic retries. The official model page currently lists only this identifier, not a dated snapshot; rerun the acceptance corpus when provider behavior changes. `AI_PROVIDER=fixture` is a small documented scripted corpus and requires fixture Places. Production never silently switches to fictional results when the selected AI provider fails.
+
+The target architecture is described in CLAUDE.md §4. This file records **what is actually implemented** (through M7, including live NVIDIA and Google Places browser verification).
 
 ```text
 Browser

@@ -66,6 +66,13 @@ export const serverEnvSchema = z
     GOOGLE_ROUTES_SERVER_API_KEY: optionalSecret,
     SUPABASE_SERVICE_ROLE_KEY: optionalSecret,
     ENABLE_AI: booleanFlag,
+    OPENAI_API_KEY: optionalSecret,
+    NVIDIA_API_KEY: optionalSecret,
+    AI_PROVIDER: z.enum(["openai", "nvidia", "fixture"]).default("openai"),
+    AI_DAILY_REQUEST_LIMIT: integerInRange(1, 1000, 50),
+    AI_RATE_LIMIT_PER_MINUTE: integerInRange(1, 60, 5),
+    AI_GLOBAL_RATE_LIMIT_PER_MINUTE: integerInRange(1, 1000, 30),
+    AI_DAILY_BUDGET_MICRO_USD: integerInRange(1, 10_000_000, 1_000_000),
     ENABLE_COMMUNITY_REPORTS: booleanFlag,
     MAX_SEARCH_RADIUS_METERS: integerInRange(
       SEARCH_RADIUS_LIMITS.minMeters,
@@ -100,6 +107,15 @@ export const serverEnvSchema = z
     TRUST_PROXY: booleanFlag,
   })
   .superRefine((env, ctx) => {
+    if (env.ENABLE_AI && env.AI_PROVIDER === "nvidia" && !env.NVIDIA_API_KEY && !env.OPENAI_API_KEY?.startsWith("nvapi-")) {
+      ctx.addIssue({ code: "custom", path: ["NVIDIA_API_KEY"], message: "is required when AI is enabled with the NVIDIA provider" });
+    }
+    if (env.ENABLE_AI && env.AI_PROVIDER === "openai" && !env.OPENAI_API_KEY) {
+      ctx.addIssue({ code: "custom", path: ["OPENAI_API_KEY"], message: "is required when AI is enabled with the OpenAI provider" });
+    }
+    if (env.ENABLE_AI && env.AI_PROVIDER === "fixture" && env.PLACES_PROVIDER !== "fixture") {
+      ctx.addIssue({ code: "custom", path: ["AI_PROVIDER"], message: "fixture AI requires fixture Places data" });
+    }
     if (env.PLACES_PROVIDER === "google" && !env.GOOGLE_PLACES_SERVER_API_KEY) {
       ctx.addIssue({
         code: "custom",
@@ -195,12 +211,20 @@ export function supabaseConfig(
  * there would expose Places Web Service access, so identical keys are refused.
  */
 export function assertSeparateGoogleKeys(
-  server: Pick<ServerEnv, "GOOGLE_PLACES_SERVER_API_KEY" | "GOOGLE_ROUTES_SERVER_API_KEY" | "SUPABASE_SERVICE_ROLE_KEY">,
+  server: Pick<ServerEnv, "GOOGLE_PLACES_SERVER_API_KEY" | "GOOGLE_ROUTES_SERVER_API_KEY" | "SUPABASE_SERVICE_ROLE_KEY"> & Partial<Pick<ServerEnv, "OPENAI_API_KEY" | "NVIDIA_API_KEY">>,
   publicEnv: Pick<
     PublicEnv,
     "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
   >,
 ): void {
+  for (const privateKey of [server.OPENAI_API_KEY, server.NVIDIA_API_KEY]) {
+    if (!privateKey) continue;
+    for (const name of ["NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
+      if (publicEnv[name] === privateKey) {
+        throw new EnvValidationError([name], [`  - ${name}: must not contain a server AI key`]);
+      }
+    }
+  }
   const service = server.SUPABASE_SERVICE_ROLE_KEY;
   // The service-role key bypasses RLS; it must never be configured as a browser key.
   for (const name of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
