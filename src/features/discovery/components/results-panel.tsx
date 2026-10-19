@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, SearchX } from "lucide-react";
+import { AlertCircle, Coffee, SearchX } from "lucide-react";
 import { useId } from "react";
 
 import { GoogleMapsAttribution } from "@/components/google-maps-attribution";
@@ -128,7 +128,8 @@ export function ResultsPanel({
       </p>
 
       {state.status === "idle" && (
-        <>
+        <div className="flex min-h-80 flex-col items-start justify-center gap-4 rounded-2xl border border-dashed bg-secondary/40 p-6 sm:p-10">
+          <span className="flex size-14 items-center justify-center rounded-2xl border bg-card"><Coffee aria-hidden="true" className="size-6 text-primary" /></span>
           <h2 id={headingId} className="text-lg font-semibold">
             Results
           </h2>
@@ -136,7 +137,8 @@ export function ResultsPanel({
             Choose a location and press <strong>Find My Cafe</strong> to see
             cafes nearby.
           </p>
-        </>
+          <p className="text-sm text-muted-foreground">Your next favorite spot starts with a neighborhood.</p>
+        </div>
       )}
 
       {state.status === "loading" && (
@@ -303,15 +305,16 @@ function Results({
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-lg font-semibold">
+      <div className="flex flex-col gap-2 rounded-2xl border bg-card p-5">
+        <p className="eyebrow">Recommended nearby</p>
+        <h2 id={headingId} className="text-xl font-semibold tracking-tight">
           {pluralize(data.results.length, "cafe", "cafes")} within {radius} of {locationLabel}
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <details className="text-sm text-muted-foreground"><summary className="inline-flex min-h-11 cursor-pointer items-center text-primary underline underline-offset-4">How these recommendations work</summary><p className="pt-1">
           Best match first, ranked by rating, distance, opening status
           {request.budget && request.budget !== "any" ? " and price level" : ""}.
           Things we can&apos;t verify count as neutral. {data.coverageNote}
-        </p>
+        </p></details>
         {exclusions && <p className="text-sm text-muted-foreground">{exclusions}</p>}
         {data.source === "fixture" && (
           <p className="text-sm font-medium" data-testid="demo-results-notice">

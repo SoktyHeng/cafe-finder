@@ -58,7 +58,7 @@ export function FavoriteButton({ placeId, placeName, className }: SaveButtonProp
         <span className="sr-only">: {placeName} {pressed ? "is in your favorites" : "to favorites"}</span>
       </Button>
       {error && (
-        <span role="alert" className="sr-only">
+        <span role="alert" className="w-full text-sm text-destructive">
           Couldn&apos;t update your favorites. Please try again.
         </span>
       )}
@@ -90,7 +90,7 @@ export function VisitedButton({ placeId, placeName, className }: SaveButtonProps
         <span className="sr-only">: {placeName}</span>
       </Button>
       {error && (
-        <span role="alert" className="sr-only">
+        <span role="alert" className="w-full text-sm text-destructive">
           Couldn&apos;t update your visited places. Please try again.
         </span>
       )}

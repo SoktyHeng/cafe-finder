@@ -13,7 +13,7 @@ export default function CafeDetailsPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-10">
+        <div className="page-shell max-w-6xl">
           <DetailsSkeleton />
         </div>
       }

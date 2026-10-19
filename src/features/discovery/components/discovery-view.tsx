@@ -6,6 +6,7 @@ import { useId, useMemo, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { PageHeading } from "@/components/page-heading";
 import { getPublicEnv } from "@/lib/config/public-env";
 import type { RelaxationChange } from "@/lib/recommendation/relaxation";
 import { cn } from "@/lib/utils";
@@ -78,9 +79,9 @@ export function DiscoveryView({ maxRadiusMeters }: DiscoveryViewProps) {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-10 lg:py-10">
+    <div className="page-shell grid gap-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] lg:gap-8">
       <div className="flex flex-col gap-4 lg:col-span-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Discover cafes</h1>
+        <PageHeading eyebrow="Find your everyday escape" title="Discover cafes" description="A place for your plans. Choose an area, set your preferences, and explore your best nearby matches." />
         {parsed.status === "invalid" && (
           <Alert>
             <AlertDescription>
@@ -91,7 +92,7 @@ export function DiscoveryView({ maxRadiusMeters }: DiscoveryViewProps) {
         )}
       </div>
 
-      <aside aria-label="Search settings" className="flex min-w-0 flex-col gap-3">
+      <aside aria-label="Search settings" className="flex min-w-0 flex-col gap-3 lg:self-start">
         <Button
           type="button"
           variant="outline"
@@ -104,7 +105,7 @@ export function DiscoveryView({ maxRadiusMeters }: DiscoveryViewProps) {
           <SlidersHorizontal aria-hidden="true" />
           {settingsOpen ? "Hide search settings" : "Edit search"}
         </Button>
-        <div id={settingsId} className={cn(!settingsOpen && "hidden lg:block")}>
+        <div id={settingsId} className={cn("rounded-2xl border bg-card p-4 sm:p-5", !settingsOpen && "hidden lg:block")}>
           <DiscoveryForm
             // Reset the form whenever a different search is loaded from the URL.
             key={queryString}

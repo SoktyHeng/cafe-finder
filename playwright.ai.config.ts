@@ -5,6 +5,7 @@ const port = 3101;
 export default defineConfig({
   ...base,
   testMatch: "assistant.spec.ts",
+  outputDir: "test-results-ai",
   use: { ...base.use, baseURL: `http://localhost:${port}` },
   webServer: {
     ...base.webServer,

@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Your account" };
 
 export default function AccountPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 lg:py-10">
+    <div className="page-shell max-w-5xl">
       <Suspense
         fallback={
           <div aria-hidden="true" className="flex flex-col gap-3">

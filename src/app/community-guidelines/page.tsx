@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PageHeading } from "@/components/page-heading";
 
 export const metadata: Metadata = { title: "Community guidelines" };
 
 /** Rules, moderation and privacy for member contributions (M6). */
 export default function CommunityGuidelinesPage() {
   return (
-    <article className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Community guidelines</h1>
+    <article className="page-shell flex max-w-4xl flex-col gap-6 [&>section]:rounded-2xl [&>section]:border [&>section]:bg-card [&>section]:p-5 sm:[&>section]:p-7">
+      <PageHeading eyebrow="Better places, together" title="Community guidelines" description="Help others find their place. Share what you know, respect the people behind it." />
       <p className="text-muted-foreground">
         Members can share what they found at a cafe (Wi-Fi, power outlets, noise, seating, whether
         it suits a laptop) and write short reviews. This content comes from Cafe Finder members,

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeading } from "@/components/page-heading";
 import { useKeyedRequest } from "@/hooks/use-keyed-request";
 import { AMENITY_OPTIONS, amenityValueOption, isCommunityAmenity } from "@/lib/community/schemas";
 
@@ -25,7 +26,7 @@ export function ModerationView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Moderation</h1>
+      <PageHeading eyebrow="Community care" title="Moderation" description="Review member contributions, oldest first. Keep cafe information useful, respectful and trustworthy." />
       <p role="status" className="text-sm">
         {message}
       </p>
@@ -36,12 +37,12 @@ export function ModerationView() {
         </p>
       )}
       {state.status === "done" && state.outcome.ok && state.outcome.data.items.length === 0 && (
-        <p className="text-muted-foreground">Nothing to review.</p>
+        <p className="surface text-muted-foreground">Nothing to review.</p>
       )}
       {state.status === "done" && state.outcome.ok && state.outcome.data.items.length > 0 && (
         <ul className="flex flex-col gap-3" aria-label="Moderation queue">
           {state.outcome.data.items.map((item) => (
-            <li key={item.targetId} className="flex flex-col gap-2 rounded-lg border p-4">
+            <li key={item.targetId} className="surface flex flex-col gap-4">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge variant={item.status === "hidden" ? "destructive" : "secondary"}>{item.status}</Badge>
                 <span>{item.targetType === "review" ? "Review" : "Amenity report"}</span>

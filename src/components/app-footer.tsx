@@ -8,8 +8,9 @@ type AppFooterProps = {
 
 export function AppFooter({ placesProvider }: AppFooterProps) {
   return (
-    <footer className="border-t bg-muted/40">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-6">
+    <footer className="mt-auto border-t bg-secondary/50">
+      <div className="site-container flex flex-col gap-4 py-8 text-sm text-muted-foreground sm:py-10">
+        <div className="flex flex-wrap items-start justify-between gap-4"><div><Link href="/" className="text-base font-semibold tracking-tight text-foreground">Cafe Finder.</Link><p className="mt-1 text-sm">Good coffee. Your kind of place.</p></div><Link href="/discover" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">Explore cafes</Link></div>
         {placesProvider === "fixture" && (
           <p data-testid="fixture-mode-notice">
             <span className="font-medium text-foreground">Demo mode:</span>{" "}

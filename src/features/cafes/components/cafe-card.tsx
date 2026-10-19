@@ -58,18 +58,18 @@ export function CafeCard({
       aria-labelledby={headingId}
       data-selected={selected || undefined}
       className={cn(
-        "flex scroll-mt-4 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "cafe-card flex min-w-0 scroll-mt-4 flex-col gap-4 rounded-2xl border bg-card p-5 text-card-foreground shadow-xs outline-none transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-6",
         selected && "border-primary ring-2 ring-primary",
       )}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground tabular-nums">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary tabular-nums">
               {rank}.
             </span>
-            <h3 id={headingId} className="text-base leading-snug font-semibold">
-              {name}
+            <h3 id={headingId} className="text-lg leading-snug font-semibold tracking-tight">
+              <Link href={detailsHref} className="rounded-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">{name}</Link>
             </h3>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -89,7 +89,7 @@ export function CafeCard({
         <MatchBadge recommendation={recommendation} />
       </header>
 
-      <ul className="flex flex-col gap-1.5 text-sm">
+      <ul className="grid gap-2 rounded-xl bg-background p-3 text-sm">
         <li className="flex items-center gap-2">
           <Star aria-hidden="true" className="size-4 shrink-0 text-primary" />
           <span className={cn(cafe.rating === undefined && "text-muted-foreground")}>

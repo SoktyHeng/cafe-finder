@@ -68,7 +68,7 @@ function Photo({ photo, alt }: { photo: PlacePhoto; alt: string }) {
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
-          className="w-full rounded-lg bg-muted object-cover"
+          className="max-h-[32rem] w-full rounded-xl bg-muted object-cover"
           style={{ aspectRatio: aspect }}
         />
       )}

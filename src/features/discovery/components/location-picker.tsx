@@ -117,7 +117,7 @@ export function LocationPicker({
         <ul
           id={resultsId}
           aria-label="Matching areas"
-          className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-lg border p-1"
+          className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-xl border bg-card p-1"
         >
           {matches.map((area) => {
             const selected = value?.kind === "area" && value.areaId === area.id;

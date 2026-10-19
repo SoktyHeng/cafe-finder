@@ -55,7 +55,7 @@ export function CafeDetailsView() {
   const { state, retry } = usePlaceDetails(placeId);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 lg:py-10">
+    <div className="page-shell flex max-w-6xl flex-col gap-6">
       <nav aria-label="Breadcrumb">
         <Link
           href={back.href}
@@ -133,7 +133,7 @@ function DetailsError({ code, onRetry }: { code: ApiFailureCode; onRetry: () => 
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
+    <section aria-label={title} className="details-section flex min-w-0 flex-col gap-5">
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -160,17 +160,18 @@ function Details({ data, origin }: { data: PlaceDetailsResponse; origin: BackLin
 
   return (
     <article aria-labelledby="cafe-name" className="flex flex-col gap-8">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5">
+      <header className="flex flex-col gap-4 rounded-2xl border bg-card p-5 sm:p-8">
+        <p className="eyebrow">Your next coffee stop</p>
+        <div className="flex flex-wrap gap-1.5 empty:hidden">
           {!isGoogle && <Badge variant="outline">Demo data</Badge>}
           {place.businessStatus === "closed_temporarily" && <Badge variant="destructive">Temporarily closed</Badge>}
           {place.businessStatus === "closed_permanently" && <Badge variant="destructive">Permanently closed</Badge>}
         </div>
-        <h1 id="cafe-name" className="text-3xl font-semibold tracking-tight text-balance">
+        <h1 id="cafe-name" className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
           {name}
         </h1>
         {place.address && <p className="text-muted-foreground">{place.address}</p>}
-        <ul className="flex flex-col gap-1.5 text-sm">
+        <ul className="flex flex-wrap gap-x-6 gap-y-3 border-y py-4 text-sm">
           <li className="flex items-center gap-2">
             <Star aria-hidden="true" className="size-4 shrink-0 text-primary" />
             <span className={cn(place.rating === undefined && "text-muted-foreground")}>{ratingText(place)}</span>
@@ -248,6 +249,9 @@ function Details({ data, origin }: { data: PlaceDetailsResponse; origin: BackLin
         </Section>
       )}
 
+      <nav aria-label="Cafe sections" className="flex flex-wrap gap-2 border-b pb-3 text-sm font-medium"><a className="inline-flex min-h-11 items-center rounded-full bg-secondary px-4" href="#cafe-information">Cafe information</a><a className="inline-flex min-h-11 items-center rounded-full px-4 hover:bg-secondary" href="#cafe-community">Member insights</a>{isGoogle && <a className="inline-flex min-h-11 items-center rounded-full px-4 hover:bg-secondary" href="#cafe-reviews">Google reviews</a>}</nav>
+      <div id="cafe-information" className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <aside className="lg:order-2 lg:sticky lg:top-6">
       <Section title="Opening hours">
         <OpeningHoursList
           weekdayDescriptions={place.weekdayDescriptions}
@@ -255,20 +259,23 @@ function Details({ data, origin }: { data: PlaceDetailsResponse; origin: BackLin
           sourceName={sourceName}
         />
       </Section>
+      </aside>
 
+      <div className="flex min-w-0 flex-col gap-6">
       <Section title={isGoogle ? "Amenities from Google" : "Amenities"}>
         <AmenitiesList amenities={place.amenities} source={source} />
       </Section>
 
-      <Section title="From Cafe Finder members">
+      <div id="cafe-community"><Section title="From Cafe Finder members">
         <CommunitySection placeId={place.placeId} placeName={name} />
-      </Section>
+      </Section></div>
 
       {isGoogle && (
-        <Section title="Reviews from Google">
+        <div id="cafe-reviews"><Section title="Reviews from Google">
           <ReviewsList reviews={place.reviews} placeMapsUri={place.googleMapsUri} />
-        </Section>
+        </Section></div>
       )}
+      </div></div>
     </article>
   );
 }

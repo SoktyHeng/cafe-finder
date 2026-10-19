@@ -144,6 +144,21 @@ describe("ResultsWithMap on small screens", () => {
 });
 
 describe("ResultsWithMap on wide screens", () => {
+  it("sorts locally while preserving recommendation ranks and the best-match badge", async () => {
+    setViewport(true);
+    render(<ResultsWithMap recommendations={[RECOMMENDATIONS[1], RECOMMENDATIONS[0], RECOMMENDATIONS[2]]} origin={ORIGIN} mapConfig={{ apiKey: undefined, mapId: "demo" }} detailsHref={(id) => `/cafes/${id}`} />);
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort cafes" }), "distance");
+    const nearest = within(screen.getByRole("list", { name: "Cafes, nearest first" })).getAllByRole("article");
+    expect(nearest.map((item) => item.getAttribute("aria-labelledby"))).toHaveLength(3);
+    expect(nearest[0]).toHaveAccessibleName("Alpha");
+    expect(nearest[2]).toHaveAccessibleName("No Coordinates");
+    expect(within(card("Bravo")).getByText("Best match")).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort cafes" }), "rating");
+    expect(within(screen.getByRole("list", { name: "Cafes, highest rated first" })).getAllByRole("article")[0]).toHaveAccessibleName("Alpha");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort cafes" }), "match");
+    expect(within(screen.getByRole("list", { name: "Cafes, best match first" })).getAllByRole("article")[0]).toHaveAccessibleName("Bravo");
+  });
   beforeEach(() => setViewport(true));
 
   it("shows list and map side by side without a toggle", async () => {

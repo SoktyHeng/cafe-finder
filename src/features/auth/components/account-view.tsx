@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PageHeading } from "@/components/page-heading";
 import { FilterControls } from "@/features/discovery/components/filter-controls";
 import { PreferenceControls } from "@/features/discovery/components/preference-controls";
 import { PurposePicker } from "@/features/discovery/components/purpose-picker";
@@ -26,7 +27,7 @@ const INPUT_CLASS =
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+    <section id={title === "Profile" ? "profile" : title === "Search defaults" ? "search-defaults" : "account-deletion"} aria-labelledby={id} className="surface flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h2 id={id} className="text-lg font-semibold">
           {title}
@@ -48,7 +49,7 @@ export function AccountView({ profile, preferences, maxRadiusMeters }: AccountVi
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Your account</h1>
+        <PageHeading eyebrow="Make it yours" title="Your account" description="A few personal touches for your next cafe search." />
         <Button
           type="button"
           variant="outline"
@@ -64,9 +65,12 @@ export function AccountView({ profile, preferences, maxRadiusMeters }: AccountVi
           Sign out
         </Button>
       </div>
-      <ProfileSection profile={profile} />
-      <PreferencesSection preferences={preferences} maxRadiusMeters={maxRadiusMeters} />
-      <DeleteAccountSection />
+      <div className="grid items-start gap-6 md:grid-cols-[12rem_minmax(0,1fr)]">
+        <nav aria-label="Account sections" className="flex flex-wrap gap-1 rounded-xl border bg-card p-2 text-sm md:sticky md:top-6 md:flex-col"><a href="#profile" className="min-h-11 rounded-lg px-3 py-3 hover:bg-secondary">Profile</a><a href="#search-defaults" className="min-h-11 rounded-lg px-3 py-3 hover:bg-secondary">Search defaults</a><a href="#account-deletion" className="min-h-11 rounded-lg px-3 py-3 text-destructive hover:bg-muted">Delete account</a></nav>
+        <div className="flex min-w-0 flex-col gap-6"><ProfileSection profile={profile} />
+        <PreferencesSection preferences={preferences} maxRadiusMeters={maxRadiusMeters} />
+        <DeleteAccountSection /></div>
+      </div>
     </div>
   );
 }

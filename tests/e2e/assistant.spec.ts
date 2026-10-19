@@ -13,6 +13,20 @@ test.describe("AI fixture conversation", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.skip(!(testInfo.config.configFile?.endsWith("playwright.ai.config.ts") ?? false), "enabled-mode suite only");
   });
+  for (const width of [375, 768, 1024, 1440]) {
+    test(`assistant layout and results at ${width}px`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "desktop-chromium", "Explicit widths run once");
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/assistant");
+      const input = page.getByRole("textbox", { name: /What kind of cafe/ });
+      await input.fill("Find a quiet cafe with Wi-Fi under $5 in BKK1.");
+      await page.getByRole("button", { name: "Search with assistant" }).click();
+      await expect(page.getByRole("heading", { name: /cafes within 3 km/ })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
+      await page.screenshot({ path: testInfo.outputPath(`assistant-${width}.png`), fullPage: true });
+    });
+  }
   test("search, follow-up, grounded results, details and regular fallback", async ({ page }) => {
     let calls = 0;
     page.on("request", (request) => { if (request.url().endsWith("/api/assistant")) calls++; });

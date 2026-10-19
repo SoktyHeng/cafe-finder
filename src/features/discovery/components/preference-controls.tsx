@@ -43,9 +43,9 @@ export function PreferenceControls({
         <p className="flex gap-2 rounded-md bg-secondary p-3 text-xs text-secondary-foreground">
           <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           <span>
-            We can&apos;t verify budget, Wi-Fi or quietness for cafes yet. These
-            preferences don&apos;t filter results. Each cafe shows them as
-            &ldquo;not verified&rdquo;.
+            These are preferences, not strict filters. Budget uses qualitative price levels,
+            not menu prices. Wi-Fi and quietness need sufficient approved member reports;
+            otherwise each cafe labels them &ldquo;not verified&rdquo;.
           </span>
         </p>
 

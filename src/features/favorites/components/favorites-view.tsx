@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { GoogleMapsAttribution } from "@/components/google-maps-attribution";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeading } from "@/components/page-heading";
 import { directionsUrl } from "@/lib/google/maps-urls";
 import type { PlaceSummary } from "@/lib/places/schemas";
 import { MAX_NOTES_LENGTH, type Favorite, type Visit } from "@/lib/user-data/schemas";
@@ -46,10 +47,7 @@ export function FavoritesView({ favorites: initialFavorites, visits: initialVisi
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Your favorites</h1>
-        <p className="text-sm text-muted-foreground">
-          Saved to your account, available on any device you sign in on.
-        </p>
+        <PageHeading eyebrow="Your little black book" title="Your favorites" description="The places you love, and the ones you'll come back to. Saved to your account, available on any device you sign in on." action={<Button asChild variant="outline"><Link href="/discover">Discover more cafes</Link></Button>} />
         {degraded && (
           <p className="text-sm text-muted-foreground">
             Some cafe details couldn&apos;t load right now. Your saved list is complete; reload later for names
@@ -57,7 +55,7 @@ export function FavoritesView({ favorites: initialFavorites, visits: initialVisi
           </p>
         )}
         {anyGoogle && <GoogleMapsAttribution />}
-        <p role="status" className="sr-only">
+        <p role="status" className="text-sm text-primary empty:hidden">
           {message}
         </p>
       </div>
@@ -76,7 +74,7 @@ export function FavoritesView({ favorites: initialFavorites, visits: initialVisi
             </Button>
           </div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="grid items-start gap-5 md:grid-cols-2">
             {favorites.map((favorite) => (
               <li key={favorite.placeId}>
                 <FavoriteItem
@@ -91,7 +89,7 @@ export function FavoritesView({ favorites: initialFavorites, visits: initialVisi
         )}
       </section>
 
-      <section aria-labelledby="visited-heading" className="flex flex-col gap-3">
+      <section aria-labelledby="visited-heading" className="surface flex flex-col gap-4">
         <h2 id="visited-heading" className="text-lg font-semibold">
           Visited ({visits.length})
         </h2>
@@ -158,9 +156,9 @@ function FavoriteItem({
   };
 
   return (
-    <article aria-label={name} className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+    <article aria-label={name} className="flex min-w-0 flex-col gap-5 rounded-2xl border bg-card p-5 sm:p-6">
       <div className="flex flex-col gap-1">
-        <Link href={`/cafes/${encodeURIComponent(favorite.placeId)}`} className="text-base font-semibold underline-offset-4 hover:underline">
+        <Link href={`/cafes/${encodeURIComponent(favorite.placeId)}`} className="inline-flex min-h-11 items-center text-xl font-semibold tracking-tight underline-offset-4 hover:underline">
           {name}
         </Link>
         <div className="flex flex-wrap gap-1.5">

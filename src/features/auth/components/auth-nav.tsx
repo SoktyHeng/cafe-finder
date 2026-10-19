@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Suspense } from "react";
+import { NavigationLink as Link } from "@/components/navigation-link";
 
 import { useAuth } from "../auth-provider";
 
@@ -13,19 +14,19 @@ export function AuthNav() {
   if (auth.status === "unavailable" || auth.status === "loading") return null;
   if (auth.status === "signed-out") {
     return (
-      <Link href="/login" className={LINK_CLASS}>
+      <Suspense><Link href="/login" className={LINK_CLASS}>
         Sign in
-      </Link>
+      </Link></Suspense>
     );
   }
   return (
-    <>
+    <Suspense>
       <Link href="/favorites" className={LINK_CLASS}>
         Favorites
       </Link>
       <Link href="/account" className={LINK_CLASS}>
         Account
       </Link>
-    </>
+    </Suspense>
   );
 }

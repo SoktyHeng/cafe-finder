@@ -1,5 +1,7 @@
 # Cafe Finder
 
+The responsive consumer UI and its page-by-page audit are documented in [UI/UX review](docs/ui-ux-review.md). Design QA includes explicit 375, 768, 1024 and 1440px route checks, with separate enabled-assistant and signed-out-auth browser suites.
+
 M7 adds an optional conversational search assistant at `/assistant`. It is **off by default**. The configured AI provider parses preferences only; the existing Places provider, approved community evidence, and deterministic recommendation engine supply all cafe facts and match explanations. See the M7 entry in [milestones](docs/milestones.md) for verification status; M8 has not started.
 
 To try the scripted offline demo, set `ENABLE_AI=true`, `AI_PROVIDER=fixture`, and `PLACES_PROVIDER=fixture`, then rebuild/restart. Try “Find a quiet cafe with Wi-Fi under $5 in BKK1.” followed by “Only open now, within 2 km.” This mode is labelled as a scripted demo and does not call OpenAI.

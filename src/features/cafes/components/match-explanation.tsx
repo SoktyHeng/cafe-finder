@@ -26,14 +26,14 @@ const percent = (value: number) => `${Math.round(value * 100)}%`;
 export function MatchBadge({ recommendation }: { recommendation: Recommendation }) {
   const { matchPercent, confidence } = recommendation;
   return (
-    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right" data-testid="match-badge">
+    <div className="flex shrink-0 flex-col items-end gap-1 rounded-lg bg-secondary px-2.5 py-2 text-right" data-testid="match-badge">
       {matchPercent === null ? (
         <Badge variant="outline" className="font-medium">
           Limited data
         </Badge>
       ) : (
         <>
-          <span className="text-lg leading-none font-semibold text-primary tabular-nums">
+          <span className="text-sm leading-none font-semibold text-primary tabular-nums">
             {matchPercent}% match
           </span>
           <span className="text-xs text-muted-foreground">{CONFIDENCE_LABELS[confidence]}</span>

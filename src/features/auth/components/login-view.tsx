@@ -63,14 +63,14 @@ export function LoginView() {
         </p>
       </div>
 
-      <div role="group" aria-label="Account" className="grid grid-cols-2 gap-2">
+      <div role="group" aria-label="Account" className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
         {(["sign-in", "sign-up"] as const).map((option) => (
           <Button
             key={option}
             type="button"
             size="lg"
-            variant={mode === option ? "default" : "outline"}
-            className="min-h-11"
+            variant={mode === option ? "outline" : "ghost"}
+            className="min-h-11 border-transparent aria-pressed:bg-card aria-pressed:shadow-xs"
             aria-pressed={mode === option}
             onClick={() => setMode(option)}
           >
@@ -107,6 +107,7 @@ export function LoginView() {
 
 function CredentialsForm({ mode, next }: { mode: Mode; next: string }) {
   const id = useId();
+  const [showPassword, setShowPassword] = useState(false);
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     mode === "sign-in" ? signInAction : signUpAction,
     INITIAL_AUTH_STATE,
@@ -171,14 +172,14 @@ function CredentialsForm({ mode, next }: { mode: Mode; next: string }) {
         <label htmlFor={`${id}-password`} className="text-sm font-medium">
           Password
         </label>
-        <input
+        <div className="relative"><input
           {...field("password")}
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
           required
           minLength={mode === "sign-up" ? PASSWORD_MIN_LENGTH : undefined}
-          className={INPUT_CLASS}
-        />
+          className={`${INPUT_CLASS} pr-20`}
+        /><button type="button" aria-pressed={showPassword} aria-controls={`${id}-password`} onClick={() => setShowPassword((shown) => !shown)} className="absolute inset-y-0 right-1 min-h-11 rounded-lg px-3 text-sm font-medium text-primary hover:bg-secondary">{showPassword ? "Hide" : "Show"}<span className="sr-only"> password</span></button></div>
         {mode === "sign-up" && !fieldErrors.password && (
           <p className="text-xs text-muted-foreground">At least {PASSWORD_MIN_LENGTH} characters.</p>
         )}

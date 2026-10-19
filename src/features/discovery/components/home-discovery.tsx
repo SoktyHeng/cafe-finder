@@ -50,6 +50,7 @@ export function HomeDiscovery({ maxRadiusMeters }: HomeDiscoveryProps) {
         </p>
       )}
       <DiscoveryForm
+        compact
         // Remount once saved defaults arrive so they become the form's starting values.
         key={preferences ? "saved" : "default"}
         initialValues={preferences ? preferencesToFormValues(preferences) : DEFAULT_FORM_VALUES}

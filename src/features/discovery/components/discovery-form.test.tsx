@@ -91,7 +91,7 @@ describe("DiscoveryForm", () => {
 
   it("explains that budget, Wi-Fi and quiet are not verified", () => {
     renderForm();
-    expect(screen.getByText(/can't verify budget, Wi-Fi or quietness/i)).toBeInTheDocument();
+    expect(screen.getByText(/preferences, not strict filters/i)).toHaveTextContent(/sufficient approved member reports/i);
   });
 
   it("picks the first matching area on Enter instead of submitting", async () => {

@@ -16,7 +16,7 @@ export default function DiscoverPage() {
     // The view reads search params, so it renders on the client inside Suspense.
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-10">
+        <div className="page-shell">
           <h1 className="mb-6 text-2xl font-semibold tracking-tight">Discover cafes</h1>
           <ResultsSkeleton />
         </div>

@@ -9,7 +9,7 @@ test.describe("site shell smoke", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: /find the best cafe/i }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cafe Finder" })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("link", { name: /Cafe Finder/ })).toBeVisible();
     await expect(page.getByTestId("fixture-mode-notice")).toBeVisible();
   });
 

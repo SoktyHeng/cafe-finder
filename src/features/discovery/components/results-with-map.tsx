@@ -1,7 +1,7 @@
 "use client";
 
 import { List, Map as MapIcon } from "lucide-react";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +39,13 @@ function prefersReducedMotion() {
  * parent remounts this per search, which resets selection and map framing.
  */
 export function ResultsWithMap({ recommendations, origin, mapConfig, detailsHref }: ResultsWithMapProps) {
+  const sortId = useId();
+  const [sort, setSort] = useState<"match" | "distance" | "rating">("match");
+  const sorted = useMemo(() => recommendations.map((recommendation, index) => ({ recommendation, rank: index + 1 })).sort((a, b) => {
+    if (sort === "distance") return (a.recommendation.cafe.distanceMeters ?? Infinity) - (b.recommendation.cafe.distanceMeters ?? Infinity) || a.rank - b.rank;
+    if (sort === "rating") return (b.recommendation.cafe.rating ?? -1) - (a.recommendation.cafe.rating ?? -1) || a.rank - b.rank;
+    return a.rank - b.rank;
+  }), [recommendations, sort]);
   const isWide = useMediaQuery(WIDE_LAYOUT_QUERY);
   const [view, setView] = useState<View>("list");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -84,6 +91,7 @@ export function ResultsWithMap({ recommendations, origin, mapConfig, detailsHref
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-4 py-2"><span className="text-xs text-muted-foreground">Numbers show the original match rank.</span><div className="flex items-center gap-2"><label htmlFor={sortId} className="text-sm font-medium">Sort cafes</label><select id={sortId} value={sort} onChange={(event) => { const next = event.target.value; if (next === "match" || next === "distance" || next === "rating") setSort(next); }} className="min-h-11 rounded-lg border bg-background px-3 text-sm"><option value="match">Best match</option><option value="distance">Nearest first</option><option value="rating">Highest rated</option></select></div></div>
       <div role="group" aria-label="Results view" className="flex gap-2 xl:hidden">
         <Button
           type="button"
@@ -110,12 +118,12 @@ export function ResultsWithMap({ recommendations, origin, mapConfig, detailsHref
       </div>
 
       <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start xl:gap-4">
-        <ol aria-label="Cafes, best match first" hidden={!showList} className="flex flex-col gap-3">
-          {recommendations.map((recommendation, index) => (
+        <ol aria-label={sort === "match" ? "Cafes, best match first" : sort === "distance" ? "Cafes, nearest first" : "Cafes, highest rated first"} hidden={!showList} className="flex flex-col gap-4">
+          {sorted.map(({ recommendation, rank }) => (
             <li key={recommendation.cafe.placeId}>
               <CafeCard
                 recommendation={recommendation}
-                rank={index + 1}
+                rank={rank}
                 detailsHref={detailsHref(recommendation.cafe.placeId)}
                 selected={recommendation.cafe.placeId === selectedPlaceId}
                 onShowOnMap={
@@ -132,7 +140,7 @@ export function ResultsWithMap({ recommendations, origin, mapConfig, detailsHref
           <section
             aria-label="Map of results"
             hidden={!showMap}
-            className="h-[60vh] min-h-72 overflow-hidden rounded-xl border xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]"
+            className="h-[60vh] min-h-72 overflow-hidden rounded-2xl border xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)]"
           >
             {mapConfig.apiKey ? (
               <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
