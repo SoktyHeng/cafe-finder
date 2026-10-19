@@ -45,7 +45,7 @@ This covers the M2 scope: Google Places configuration. The production checklist 
    - Application restriction: IP addresses where the host has stable egress IPs. Most serverless hosts, including standard Vercel, don't, so rely on the API restriction, quotas and the fact that the key never leaves the server.
    - Never prefix it with `NEXT_PUBLIC_`. Store it only in the host's secret store or `.env.local`, which is git-ignored.
 4. Create a **separate browser key** (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`) for the map (M4):
-   - Application restriction: **Websites (HTTP referrers)**, for example `http://localhost:3000/*` for local development and `https://your-domain/*` for production.
+   - Application restriction: **Websites (HTTP referrers)**, for example `http://localhost:3000/*` for local development and `https://your-domain/*` for production. Add every deployed domain, including `https://<project>.vercel.app/*`. A missing referrer shows as `RefererNotAllowedMapError` in the browser console, and the site shows "The map couldn't load" while the list keeps working.
    - API restriction: **Maps JavaScript API** only.
    - It ships to every visitor by design. The server refuses to start if it equals a server key.
    - Optional: create a **Map ID** (Google Cloud → Map Management, JavaScript, Vector) and set `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID`. Without one, Google's `DEMO_MAP_ID` is used, which is fine for development only.

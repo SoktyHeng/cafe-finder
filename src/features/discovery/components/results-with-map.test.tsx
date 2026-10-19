@@ -199,6 +199,17 @@ describe("ResultsWithMap on wide screens", () => {
     expect(card("Alpha")).toBeVisible();
   });
 
+  it("contains exceptions thrown by Google's map code, keeping the list usable", async () => {
+    // e.g. marker creation after a rejected key (RefererNotAllowedMapError).
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mapMock.map.fitBounds.mockImplementationOnce(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'keys')");
+    });
+    renderView();
+    expect(await screen.findByTestId("map-unavailable")).toHaveAttribute("data-reason", "failed");
+    expect(card("Alpha")).toBeVisible();
+  });
+
   it("shows a loading placeholder until the API has loaded", async () => {
     mapMock.status = "LOADING";
     renderView();

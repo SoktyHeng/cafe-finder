@@ -9,7 +9,7 @@ import {
   useApiLoadingStatus,
   useMap,
 } from "@vis.gl/react-google-maps";
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Coordinates } from "@/lib/geo/distance";
@@ -54,10 +54,29 @@ export function CafeMap(props: CafeMapProps) {
     return <MapUnavailable reason="failed" />;
   }
   return (
-    <APIProvider apiKey={props.apiKey} language="en" onError={() => setLoadFailed(true)}>
-      <CafeMapContent {...props} />
-    </APIProvider>
+    <MapErrorBoundary>
+      <APIProvider apiKey={props.apiKey} language="en" onError={() => setLoadFailed(true)}>
+        <CafeMapContent {...props} />
+      </APIProvider>
+    </MapErrorBoundary>
   );
+}
+
+/**
+ * Contains exceptions thrown by Google's map code (e.g. marker creation after a
+ * rejected key, which reports `RefererNotAllowedMapError` asynchronously) so a
+ * broken map never takes down the results list.
+ */
+class MapErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? <MapUnavailable reason="failed" /> : this.props.children;
+  }
 }
 
 function CafeMapContent({ mapId, origin, markers, selectedPlaceId, onSelect }: CafeMapProps) {
